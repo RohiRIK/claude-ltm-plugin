@@ -1,5 +1,5 @@
 {
-  "name": "claude-ltm",
+  "name": "ltm",
   "owner": {
     "name": "RohiRIK",
     "email": "rohi5054@gmail.com"
@@ -10,7 +10,7 @@
   },
   "plugins": [
     {
-      "name": "claude-ltm",
+      "name": "ltm",
       "source": "./",
       "description": "Persistent semantic memory for Claude Code — semantic search, context injection, session learning, and memory graph visualizer.",
       "version": "1.0.0",
@@ -21,6 +21,7 @@
       "keywords": [
         "memory",
         "ltm",
+        "long-term-memory",
         "semantic-search",
         "context",
         "sqlite",
