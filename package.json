@@ -1,0 +1,23 @@
+{
+  "name": "claude-ltm-plugin",
+  "version": "1.0.0",
+  "description": "Long-Term Memory plugin for Claude Code",
+  "type": "module",
+  "scripts": {
+    "typecheck": "bunx tsc --noEmit",
+    "dev:mcp": "bun run src/mcp-server.ts",
+    "dev:server": "LTM_DB_PATH=./data/ltm.db bun run src/graph-server.ts",
+    "migrate": "LTM_DB_PATH=./data/ltm.db bun run src/migrate.ts",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "bun-types": "^1.0.0",
+    "esbuild": "^0.21.0",
+    "typescript": "^5.4.0"
+  }
+}

@@ -1,0 +1,80 @@
+/**
+ * resolveProject.ts
+ * Shared utility for resolving a cwd to { name, projectDir, isNew }.
+ *
+ * Resolution order:
+ *  1. Exact match in registry.json
+ *  2. Longest prefix match in registry.json
+ *  3. Fallback: slug derived from cwd
+ *
+ * Registry: ~/.claude/projects/registry.json
+ * Format: { "/abs/path": "friendly-name" }
+ */
+
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
+import { join, sep } from "path";
+import { homedir } from "os";
+
+export const CLAUDE_DIR = join(homedir(), ".claude");
+export const PROJECTS_DIR = join(CLAUDE_DIR, "projects");
+export const REGISTRY_PATH = join(PROJECTS_DIR, "registry.json");
+
+export interface ProjectResolution {
+  name: string;
+  projectDir: string;
+  isNew: boolean;
+  registeredPath: string | null;
+}
+
+function deriveSlug(cwd: string): string {
+  return cwd.replace(new RegExp("\\" + sep, "g"), "-").replace(/\./g, "-");
+}
+
+function loadRegistry(): Record<string, string> {
+  if (!existsSync(REGISTRY_PATH)) return {};
+  try {
+    return JSON.parse(readFileSync(REGISTRY_PATH, "utf-8"));
+  } catch {
+    return {};
+  }
+}
+
+export function saveRegistry(registry: Record<string, string>): void {
+  if (!existsSync(PROJECTS_DIR)) mkdirSync(PROJECTS_DIR, { recursive: true });
+  writeFileSync(REGISTRY_PATH, JSON.stringify(registry, null, 2) + "\n");
+}
+
+export function registerPath(cwd: string, name: string): void {
+  const registry = loadRegistry();
+  registry[cwd] = name;
+  saveRegistry(registry);
+}
+
+function makeResult(name: string, registeredPath: string | null, isNew: boolean): ProjectResolution {
+  return { name, projectDir: join(PROJECTS_DIR, name), isNew, registeredPath };
+}
+
+export function resolveProject(cwd: string): ProjectResolution {
+  const registry = loadRegistry();
+
+  // 1. Exact match
+  if (registry[cwd]) {
+    return makeResult(registry[cwd], cwd, false);
+  }
+
+  // 2. Longest prefix match
+  const sortedPaths = Object.keys(registry).sort((a, b) => b.length - a.length);
+  for (const path of sortedPaths) {
+    if (cwd.startsWith(path + "/") || cwd.startsWith(path + sep)) {
+      return makeResult(registry[path]!, path, false);
+    }
+  }
+
+  // 3. Slug fallback
+  const slug = deriveSlug(cwd);
+  const slugDir = join(PROJECTS_DIR, slug);
+  const contextFiles = ["context-goals.md", "context-decisions.md", "context-progress.md", "context-gotchas.md", "context-summary.md"];
+  const hasContent = contextFiles.some(f => existsSync(join(slugDir, f)));
+
+  return { name: slug, projectDir: slugDir, isNew: !hasContent, registeredPath: null };
+}

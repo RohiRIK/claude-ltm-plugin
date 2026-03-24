@@ -1,0 +1,15 @@
+{
+  "name": "claude-ltm",
+  "description": "Long-Term Memory system for Claude Code — semantic search, context injection, session learning",
+  "version": "1.0.0",
+  "mcpServers": {
+    "ltm": {
+      "command": "bun",
+      "args": ["run", "${CLAUDE_PLUGIN_ROOT}/src/mcp-server.ts"],
+      "env": {
+        "LTM_DB_PATH": "${CLAUDE_PLUGIN_ROOT}/data/ltm.db"
+      }
+    }
+  },
+  "skills": "./skills/"
+}

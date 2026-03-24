@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "outDir": "dist",
+    "rootDir": ".",
+    "types": ["bun-types", "node"]
+  },
+  "include": ["src/**/*", "hooks/**/*"],
+  "exclude": ["node_modules", "dist", "graph-app"]
+}

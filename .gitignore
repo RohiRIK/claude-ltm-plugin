@@ -1,0 +1,16 @@
+node_modules/
+dist/
+*.bundle.mjs
+graph-app/.next/
+graph-app/node_modules/
+graph-app/test-results/
+
+# User data — never commit
+data/ltm.db
+data/ltm.db-shm
+data/ltm.db-wal
+data/*.bak*
+
+# Env
+.env
+.env.local

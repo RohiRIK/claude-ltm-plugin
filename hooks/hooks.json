@@ -1,0 +1,47 @@
+{
+  "description": "LTM hooks — context injection, session learning, progress capture, compaction snapshot",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "LTM_DB_PATH=${CLAUDE_PLUGIN_ROOT}/data/ltm.db bun run ${CLAUDE_PLUGIN_ROOT}/hooks/src/SessionStart.ts"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "LTM_DB_PATH=${CLAUDE_PLUGIN_ROOT}/data/ltm.db CLAUDE_PLUGIN_ROOT=${CLAUDE_PLUGIN_ROOT} bun run ${CLAUDE_PLUGIN_ROOT}/hooks/src/UpdateContext.ts"
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "LTM_DB_PATH=${CLAUDE_PLUGIN_ROOT}/data/ltm.db CLAUDE_PLUGIN_ROOT=${CLAUDE_PLUGIN_ROOT} bun run ${CLAUDE_PLUGIN_ROOT}/hooks/src/EvaluateSession.ts"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "LTM_DB_PATH=${CLAUDE_PLUGIN_ROOT}/data/ltm.db bun run ${CLAUDE_PLUGIN_ROOT}/hooks/src/PreCompact.ts"
+          }
+        ]
+      }
+    ]
+  }
+}

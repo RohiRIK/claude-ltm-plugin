@@ -1,0 +1,23 @@
+{
+  "id": "claude-ltm",
+  "name": "Claude LTM",
+  "kind": "tool",
+  "description": "Persistent semantic memory for Claude Code. Stores memories across sessions with FTS5 + semantic search, auto-injects context at session start, learns from transcripts, and visualizes your memory graph.",
+  "version": "1.0.0",
+  "sandbox": {
+    "mode": "permissive",
+    "filesystem_access": "full",
+    "system_access": "full"
+  },
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "enabled": {
+        "type": "boolean",
+        "default": true,
+        "description": "Enable or disable the LTM plugin."
+      }
+    },
+    "additionalProperties": false
+  }
+}
