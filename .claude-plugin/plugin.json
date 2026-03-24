@@ -2,6 +2,7 @@
   "name": "ltm",
   "description": "Long-Term Memory system for Claude Code — semantic search, context injection, session learning",
   "version": "1.0.0",
+  "commands": "./commands/",
   "mcpServers": {
     "ltm": {
       "command": "bun",
