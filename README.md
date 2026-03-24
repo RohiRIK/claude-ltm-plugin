@@ -12,32 +12,33 @@ Long-Term Memory (LTM) plugin for Claude Code. Provides persistent semantic memo
 
 ## Installation
 
-### One-liner (recommended)
+### Marketplace (recommended)
 
 ```bash
-claude plugin marketplace add https://github.com/RohiRIK/claude-ltm-plugin && claude plugin install claude-ltm
+claude plugin marketplace add https://github.com/RohiRIK/claude-ltm-plugin
+claude plugin install ltm
 ```
 
-Then restart Claude Code. The plugin will:
-- Register the `ltm` MCP server automatically
-- Wire up `SessionStart`, `Stop`, and `PreCompact` hooks
-- Make LTM skills available as `/claude-ltm:ContinuousLearning` etc.
+Then restart Claude Code. The plugin auto-wires:
+- `ltm` MCP server
+- `SessionStart`, `Stop`, and `PreCompact` hooks
+- LTM skills (`/ltm:ContinuousLearning` etc.)
+- Database at `~/.claude/plugins/data/ltm/ltm.db` (persists across updates)
 
-### First-time setup: copy your database
-
-If you already have an `ltm.db` from a previous setup:
+### Dev / git-clone flow
 
 ```bash
-cp ~/.claude/memory/ltm.db ~/.claude/plugins/cache/claude-ltm/claude-ltm/*/data/ltm.db
+git clone https://github.com/RohiRIK/claude-ltm-plugin ~/Projects/claude-ltm-plugin
+cd ~/Projects/claude-ltm-plugin && bash install.sh
 ```
 
-Otherwise a fresh database is created automatically on first run.
+Database lives at `~/.claude/memory/ltm.db` in this mode.
 
 ---
 
 ## Verifying it works
 
-After install + restart, run these checks:
+After install + restart:
 
 ### 1. MCP server is live
 ```
@@ -62,10 +63,10 @@ Start a new Claude Code session. You should see a `## Restored Project Context` 
 
 ### 5. Graph visualizer (optional)
 ```bash
-cd ~/.claude/plugins/cache/claude-ltm/claude-ltm/*/graph-app
+cd ~/.claude/plugins/cache/ltm/ltm/*/graph-app
 bun dev --port 7332
 # In a second terminal:
-LTM_DB_PATH=../data/ltm.db bun run ../src/graph-server.ts
+bun run ../src/graph-server.ts
 ```
 Open http://localhost:7332 to see your memory graph.
 
@@ -76,10 +77,10 @@ Open http://localhost:7332 to see your memory graph.
 ```
 src/              TypeScript source (MCP server + DB layer)
 hooks/src/        Session lifecycle hooks (bun-native TypeScript)
-hooks/hooks.json  Hook registrations for the plugin system
-skills/           Claude Code skills (ContinuousLearning, LtmServer, Learned)
+hooks/hooks.json  Hook registrations (auto-wired on install)
+scripts/          Install utilities
+skills/           Claude Code skills
 graph-app/        Next.js graph visualizer (port 7332)
-data/ltm.db       SQLite database (user data, not committed)
 migrations/       SQL schema migrations
 ```
 
@@ -93,6 +94,7 @@ migrations/       SQL schema migrations
 | `ltm_forget` | Delete a memory |
 | `ltm_graph` | Traverse memory graph |
 | `ltm_context` | Get per-project context items |
+| `ltm_context_items` | List context items by type |
 
 ## Configuration
 
@@ -110,4 +112,7 @@ Configure via `~/.claude/config.json`:
 }
 ```
 
-The database lives at `<plugin-install-dir>/data/ltm.db` by default. Override with `LTM_DB_PATH` env var.
+**Database path priority:**
+1. `LTM_DB_PATH` env var (explicit override)
+2. `CLAUDE_PLUGIN_DATA/ltm.db` (marketplace install — set automatically)
+3. `~/.claude/memory/ltm.db` (dev/install.sh fallback)
