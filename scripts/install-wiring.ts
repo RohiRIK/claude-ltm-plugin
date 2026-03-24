@@ -18,17 +18,17 @@ if (!root) {
 const CLAUDE_DIR = join(homedir(), ".claude");
 const claudeJson = join(homedir(), ".claude.json");
 
-// ── DB migration ──────────────────────────────────────────────────────────────
 const pluginData = process.env.CLAUDE_PLUGIN_DATA;
-const legacyDb   = join(CLAUDE_DIR, "memory", "ltm.db");
 
 if (pluginData) {
-  mkdirSync(pluginData, { recursive: true });
-  const targetDb = join(pluginData, "ltm.db");
-  if (!existsSync(targetDb) && existsSync(legacyDb)) {
+  const targetDb  = join(pluginData, "ltm.db");
+  const legacyDb  = join(CLAUDE_DIR, "memory", "ltm.db");
+  const hasTarget = existsSync(targetDb);
+  if (!hasTarget && existsSync(legacyDb)) {
+    mkdirSync(pluginData, { recursive: true });
     copyFileSync(legacyDb, targetDb);
     console.log(`  ✔ Migrated ltm.db → ${targetDb}`);
-  } else if (!existsSync(targetDb)) {
+  } else if (!hasTarget) {
     console.log("  ✔ Fresh install — ltm.db will be created on first run");
   } else {
     console.log(`  ✔ ltm.db ready at ${targetDb}`);
