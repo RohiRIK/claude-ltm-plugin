@@ -22,30 +22,28 @@ echo ""
 mkdir -p "$HOME/.claude/memory"
 echo "  ✔ ~/.claude/memory/ ready — db at $DB_PATH"
 
-# ── 2. Register MCP server in ~/.claude.json ────────────────────────────────
+# ── 2. Register MCP + wire hooks ────────────────────────────────────────────
 [[ ! -f "$CLAUDE_JSON" ]] && echo '{}' > "$CLAUDE_JSON"
 
 python3 - <<PYEOF
 import json
-root = "$PLUGIN_ROOT"
-path = "$CLAUDE_JSON"
-with open(path) as f:
+root     = "$PLUGIN_ROOT"
+claude   = "$CLAUDE_JSON"
+settings = "$SETTINGS_JSON"
+
+# MCP registration
+with open(claude) as f:
     d = json.load(f)
 d.setdefault("mcpServers", {})["ltm"] = {
     "type": "stdio",
     "command": "bun",
     "args": ["run", f"{root}/src/mcp-server.ts"]
 }
-with open(path, "w") as f:
+with open(claude, "w") as f:
     json.dump(d, f, indent=2)
 print("  ✔ MCP server registered in ~/.claude.json")
-PYEOF
 
-# ── 3. Wire hooks into ~/.claude/settings.json ──────────────────────────────
-python3 - <<PYEOF
-import json
-root     = "$PLUGIN_ROOT"
-settings = "$SETTINGS_JSON"
+# Hooks wiring
 with open(settings) as f:
     d = json.load(f)
 hooks = d.setdefault("hooks", {})
