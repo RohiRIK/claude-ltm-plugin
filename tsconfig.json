@@ -10,5 +10,5 @@
     "types": ["bun-types", "node"]
   },
   "include": ["src/**/*", "hooks/**/*"],
-  "exclude": ["node_modules", "dist", "graph-app"]
+  "exclude": ["node_modules", "dist", "graph-app", "src/graph-server.ts", "src/cluster.ts"]
 }

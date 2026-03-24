@@ -110,7 +110,7 @@ Empty array if nothing found. No markdown fences.`;
     extracted = JSON.parse(raw.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim());
   } catch { return; }
 
-  const LEARN_ITEMS: Array<{ key: keyof typeof extracted; category: string; importance: number }> = [
+  const LEARN_ITEMS: Array<{ key: keyof typeof extracted; category: import("../../src/db.js").MemoryCategory; importance: number }> = [
     { key: "decisions", category: "architecture", importance: 3 },
     { key: "gotchas",   category: "gotcha",       importance: 4 },
     { key: "patterns",  category: "pattern",       importance: 3 },

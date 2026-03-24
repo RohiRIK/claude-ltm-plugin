@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "fs";
+import { homedir } from "os";
 import { join } from "path";
 import { resolveProject, PROJECTS_DIR, CLAUDE_DIR, getDbPath } from "../lib/resolveProject.js";
 import { readStdinPassthrough, parseHookInput, readFileSafe, appendLine, trimToLines } from "../lib/hookUtils.js";
