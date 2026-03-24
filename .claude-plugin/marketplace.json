@@ -1,0 +1,31 @@
+{
+  "name": "claude-ltm",
+  "owner": {
+    "name": "RohiRIK",
+    "email": "rohi5054@gmail.com"
+  },
+  "metadata": {
+    "description": "Long-Term Memory plugin for Claude Code",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "claude-ltm",
+      "source": "./",
+      "description": "Persistent semantic memory for Claude Code — semantic search, context injection, session learning, and memory graph visualizer.",
+      "version": "1.0.0",
+      "author": {
+        "name": "RohiRIK"
+      },
+      "category": "development",
+      "keywords": [
+        "memory",
+        "ltm",
+        "semantic-search",
+        "context",
+        "sqlite",
+        "mcp"
+      ]
+    }
+  ]
+}
