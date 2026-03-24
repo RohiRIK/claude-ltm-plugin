@@ -3,18 +3,18 @@
   "hooks": {
     "SessionStart": [
       {
-        "matcher": "*",
+        "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "LTM_DB_PATH=${CLAUDE_PLUGIN_ROOT}/data/ltm.db bun run ${CLAUDE_PLUGIN_ROOT}/hooks/src/SessionStart.ts"
+            "command": "LTM_DB_PATH=${CLAUDE_PLUGIN_ROOT}/data/ltm.db CLAUDE_PLUGIN_ROOT=${CLAUDE_PLUGIN_ROOT} bun run ${CLAUDE_PLUGIN_ROOT}/hooks/src/SessionStart.ts"
           }
         ]
       }
     ],
     "Stop": [
       {
-        "matcher": "*",
+        "matcher": "",
         "hooks": [
           {
             "type": "command",
@@ -23,7 +23,7 @@
         ]
       },
       {
-        "matcher": "*",
+        "matcher": "",
         "hooks": [
           {
             "type": "command",
@@ -34,11 +34,11 @@
     ],
     "PreCompact": [
       {
-        "matcher": "*",
+        "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "LTM_DB_PATH=${CLAUDE_PLUGIN_ROOT}/data/ltm.db bun run ${CLAUDE_PLUGIN_ROOT}/hooks/src/PreCompact.ts"
+            "command": "LTM_DB_PATH=${CLAUDE_PLUGIN_ROOT}/data/ltm.db CLAUDE_PLUGIN_ROOT=${CLAUDE_PLUGIN_ROOT} bun run ${CLAUDE_PLUGIN_ROOT}/hooks/src/PreCompact.ts"
           }
         ]
       }
