@@ -1,21 +1,15 @@
 #!/usr/bin/env bun
 import { existsSync, mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
-import { homedir } from "os";
-import { resolveProject } from "../lib/resolveProject.js";
+import { resolveProject, getDbPath } from "../lib/resolveProject.js";
 import { readStdin, parseHookInput, readFileSafe, budgetSection } from "../lib/hookUtils.js";
 import { logHook } from "../lib/hookLogger.js";
 import { getItems, exportContextMarkdown } from "../../src/context.js";
 
-const DB_PATH =
-  process.env.LTM_DB_PATH ??
-  (process.env.CLAUDE_PLUGIN_ROOT
-    ? join(process.env.CLAUDE_PLUGIN_ROOT, "data", "ltm.db")
-    : join(homedir(), ".claude", "memory", "ltm.db"));
+const DB_PATH = getDbPath();
 
 async function buildSummaryFromDb(name: string, cwd: string): Promise<string | null> {
   try {
-    // getItems and exportContextMarkdown imported at top
     exportContextMarkdown(name);
     const toLines = (items: Array<{ content: string }>) => items.map(i => i.content);
     const timestamp = new Date().toISOString().replace("T", " ").replace(/\..+/, "");

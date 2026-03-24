@@ -1,18 +1,14 @@
 #!/usr/bin/env bun
 import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from "fs";
 import { join } from "path";
-import { homedir } from "os";
-import { resolveProject, PROJECTS_DIR } from "../lib/resolveProject.js";
+import { resolveProject, PROJECTS_DIR, CLAUDE_DIR, getDbPath } from "../lib/resolveProject.js";
 import { logHook } from "../lib/hookLogger.js";
 import { learn } from "../../src/db.js";
 import { getLlmConfig, callLlm } from "../../src/embeddings.js";
 import { addItem } from "../../src/context.js";
 import { readConfigSync } from "../../src/config.js";
+import type { Config } from "../../src/config.js";
 
-// Evaluate Session Hook
-// Extracts patterns from transcript
-
-const CLAUDE_DIR = join(homedir(), ".claude");
 const PLUGIN_ROOT = process.env.CLAUDE_PLUGIN_ROOT ?? join(CLAUDE_DIR, "memory");
 const LEARNED_DIR = join(PLUGIN_ROOT, "skills", "Learned");
 const PATTERNS_DIR = join(LEARNED_DIR, "patterns");
@@ -95,7 +91,6 @@ function extractAssistantText(messages: any[]): string {
 }
 
 async function runLlmExtraction(text: string, projectName: string, sessionId?: string): Promise<void> {
-  // getLlmConfig, callLlm, learn, addItem imported at top
   const cfg = getLlmConfig();
   if (!cfg) return;
 
@@ -161,7 +156,6 @@ async function main() {
     }
 
     if (!transcriptPath || !existsSync(transcriptPath)) {
-      // console.error("[ContinuousLearning] Could not find transcript path.");
       return;
     }
 
@@ -248,7 +242,6 @@ async function main() {
     fileContent += "\n";
 
     writeFileSync(patternFile, fileContent);
-    // console.error(`[ContinuousLearning] Patterns saved to: ${patternFile}`);
 
     const projectName = resolveProject(input.cwd ?? "").name;
     try {
@@ -261,7 +254,7 @@ async function main() {
     } catch { /* non-fatal */ }
 
     try {
-      if ((readConfigSync() as { ltm?: { evaluateSessionLlm?: boolean } }).ltm?.evaluateSessionLlm) {
+      if ((readConfigSync() as Config).ltm?.evaluateSessionLlm) {
         const assistantText = extractAssistantText(messages);
         if (assistantText.length > 100) {
           runLlmExtraction(assistantText, projectName, sessionId).catch((err: unknown) => {
@@ -288,8 +281,6 @@ async function main() {
         : summaryContent + newLine;
       writeFileSync(SUMMARY_FILE, newSummary);
     }
-
-    // console.error(`[ContinuousLearning] Summary updated: ${SUMMARY_FILE}`);
 
   } catch (error) {
     // Fail silently on parse error or logic error to not break hook

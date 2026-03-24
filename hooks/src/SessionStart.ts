@@ -1,8 +1,7 @@
 #!/usr/bin/env bun
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "fs";
 import { join } from "path";
-import { homedir } from "os";
-import { resolveProject, registerPath, PROJECTS_DIR } from "../lib/resolveProject.js";
+import { resolveProject, registerPath, PROJECTS_DIR, CLAUDE_DIR, getDbPath } from "../lib/resolveProject.js";
 import { readStdin, parseHookInput, trimToLines } from "../lib/hookUtils.js";
 import { logHook } from "../lib/hookLogger.js";
 import { getContextMerge, getSimilarMemories, getContextMergeWithGraph } from "../../src/db.js";
@@ -12,14 +11,9 @@ import { readConfigSync } from "../../src/config.js";
 import { exportContextMarkdown } from "../../src/context.js";
 import { runPendingMigrations } from "../../src/migrations.js";
 
-const CLAUDE_DIR   = join(homedir(), ".claude");
 const TMP_DIR      = join(CLAUDE_DIR, "tmp");
 const COUNTER_FILE = join(TMP_DIR, "session-tool-count.txt");
-const DB_PATH      =
-  process.env.LTM_DB_PATH ??
-  (process.env.CLAUDE_PLUGIN_ROOT
-    ? join(process.env.CLAUDE_PLUGIN_ROOT, "data", "ltm.db")
-    : join(CLAUDE_DIR, "memory", "ltm.db"));
+const DB_PATH      = getDbPath();
 const MAX_INJECT_LINES = 60;
 const MAX_LTM_LINES    = 30;
 const MAX_AGE_MS       = 30 * 24 * 60 * 60 * 1000;

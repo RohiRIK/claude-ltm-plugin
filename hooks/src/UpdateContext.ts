@@ -1,8 +1,7 @@
 #!/usr/bin/env bun
-import { existsSync, mkdirSync, readFileSync, readdirSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "fs";
 import { join } from "path";
-import { homedir } from "os";
-import { resolveProject, PROJECTS_DIR, CLAUDE_DIR } from "../lib/resolveProject.js";
+import { resolveProject, PROJECTS_DIR, CLAUDE_DIR, getDbPath } from "../lib/resolveProject.js";
 import { readStdinPassthrough, parseHookInput, readFileSafe, appendLine, trimToLines } from "../lib/hookUtils.js";
 import { logHook } from "../lib/hookLogger.js";
 import { addItem } from "../../src/context.js";
@@ -10,11 +9,7 @@ import { addItem } from "../../src/context.js";
 const TOOL_NAMES = new Set(["Write", "Edit", "MultiEdit"]);
 const MAX_PROGRESS_LINES = 20;
 const MAX_DISPLAY_FILES = 5;
-const DB_PATH =
-  process.env.LTM_DB_PATH ??
-  (process.env.CLAUDE_PLUGIN_ROOT
-    ? join(process.env.CLAUDE_PLUGIN_ROOT, "data", "ltm.db")
-    : join(homedir(), ".claude", "memory", "ltm.db"));
+const DB_PATH = getDbPath();
 
 function findTranscriptPath(
   transcriptPath: string | undefined,
@@ -110,7 +105,6 @@ async function main(): Promise<void> {
     // Write to DB if available, fall back to .md file
     if (existsSync(DB_PATH)) {
       try {
-        // addItem imported at top
         const prefixMatch = sessionLine.match(/^\[(decision|gotcha)\]\s*/i);
         if (prefixMatch) {
           const type = prefixMatch[1]!.toLowerCase() as "decision" | "gotcha";
@@ -139,7 +133,6 @@ async function main(): Promise<void> {
     const content = readFileSafe(progressFile);
     const lines = content.split("\n").filter(Boolean);
     if (lines.length > MAX_PROGRESS_LINES) {
-      const { writeFileSync } = await import("fs");
       writeFileSync(progressFile, trimToLines(content, MAX_PROGRESS_LINES));
     }
 
