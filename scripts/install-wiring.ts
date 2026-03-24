@@ -5,7 +5,7 @@
  *
  * Usage: bun run scripts/install-wiring.ts <plugin-root>
  */
-import { existsSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, copyFileSync, mkdirSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 
@@ -17,6 +17,23 @@ if (!root) {
 
 const CLAUDE_DIR = join(homedir(), ".claude");
 const claudeJson = join(homedir(), ".claude.json");
+
+// ── DB migration ──────────────────────────────────────────────────────────────
+const pluginData = process.env.CLAUDE_PLUGIN_DATA;
+const legacyDb   = join(CLAUDE_DIR, "memory", "ltm.db");
+
+if (pluginData) {
+  mkdirSync(pluginData, { recursive: true });
+  const targetDb = join(pluginData, "ltm.db");
+  if (!existsSync(targetDb) && existsSync(legacyDb)) {
+    copyFileSync(legacyDb, targetDb);
+    console.log(`  ✔ Migrated ltm.db → ${targetDb}`);
+  } else if (!existsSync(targetDb)) {
+    console.log("  ✔ Fresh install — ltm.db will be created on first run");
+  } else {
+    console.log(`  ✔ ltm.db ready at ${targetDb}`);
+  }
+}
 const settingsJson = join(CLAUDE_DIR, "settings.json");
 
 // ── MCP registration ─────────────────────────────────────────────────────────
