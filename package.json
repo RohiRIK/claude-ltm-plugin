@@ -1,6 +1,6 @@
 {
   "name": "claude-ltm-plugin",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Long-Term Memory plugin for Claude Code",
   "type": "module",
   "scripts": {
@@ -9,7 +9,8 @@
     "dev:server": "LTM_DB_PATH=./data/ltm.db bun run src/graph-server.ts",
     "migrate": "LTM_DB_PATH=./data/ltm.db bun run src/migrate.ts",
     "test": "bun test --path-ignore-patterns='graph-app/**' --pass-with-no-tests",
-    "test:e2e": "cd graph-app && bunx playwright test"
+    "test:e2e": "cd graph-app && bunx playwright test",
+    "postinstall": "bun run scripts/update-wiring.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1",

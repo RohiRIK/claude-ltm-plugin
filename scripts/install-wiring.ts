@@ -5,9 +5,10 @@
  *
  * Usage: bun run scripts/install-wiring.ts <plugin-root>
  */
-import { existsSync, readFileSync, writeFileSync, copyFileSync, mkdirSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, copyFileSync, mkdirSync, chmodSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
+import { execSync } from "child_process";
 
 const root = process.argv[2];
 if (!root) {
@@ -72,3 +73,23 @@ for (const [event, command] of LTM_HOOKS) {
 
 writeFileSync(settingsJson, JSON.stringify(settings, null, 2));
 console.log("  ✔ Hooks wired into ~/.claude/settings.json");
+
+// ── Global git post-commit hook ───────────────────────────────────────────────
+const gitHooksDir = join(CLAUDE_DIR, "hooks", "git");
+mkdirSync(gitHooksDir, { recursive: true });
+
+const postCommitPath = join(gitHooksDir, "post-commit");
+const postCommitScript = `#!/bin/sh\nCLAUDE_PLUGIN_ROOT=${root} bun run ${root}/hooks/src/GitCommit.ts "$@"\n`;
+
+if (!existsSync(postCommitPath) || !readFileSync(postCommitPath, "utf-8").includes("GitCommit")) {
+  writeFileSync(postCommitPath, postCommitScript);
+  chmodSync(postCommitPath, 0o755);
+}
+
+try {
+  execSync(`git config --global core.hooksPath ${gitHooksDir}`, { stdio: "ignore" });
+  console.log("  ✔ Global git post-commit hook installed (~/.claude/hooks/git/)");
+  console.log("  ℹ  Enable with: ltm.gitLearnEnabled=true in ~/.claude/config.json");
+} catch {
+  console.log("  ⚠  Could not set git core.hooksPath — set manually: git config --global core.hooksPath " + gitHooksDir);
+}

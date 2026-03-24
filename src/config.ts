@@ -21,6 +21,10 @@ export interface LtmConfig {
   graphReasoning: boolean;
   evaluateSessionLlm: boolean;
   semanticFallback: boolean;
+  gitLearnEnabled: boolean;
+  gitLearnMinDiffChars: number;
+  gitLearnFileFilter: string[];
+  gitLearnIgnorePatterns: string[];
 }
 
 export interface ServerConfig {
@@ -50,6 +54,10 @@ const DEFAULTS: Config = {
     graphReasoning: false,
     evaluateSessionLlm: false,
     semanticFallback: true,
+    gitLearnEnabled: false,
+    gitLearnMinDiffChars: 200,
+    gitLearnFileFilter: [],
+    gitLearnIgnorePatterns: ["package-lock.json", "*.lock", "dist/", ".min.js"],
   },
   server: {
     apiPort: 7331,
@@ -90,6 +98,21 @@ export function validateConfig(raw?: unknown): { valid: boolean; errors: string[
       }
       if ("semanticFallback" in ltm && typeof ltm["semanticFallback"] !== "boolean") {
         errors.push("ltm.semanticFallback: must be a boolean");
+      }
+      if ("gitLearnEnabled" in ltm && typeof ltm["gitLearnEnabled"] !== "boolean") {
+        errors.push("ltm.gitLearnEnabled: must be a boolean");
+      }
+      if ("gitLearnMinDiffChars" in ltm) {
+        const n = ltm["gitLearnMinDiffChars"];
+        if (typeof n !== "number" || !Number.isInteger(n) || (n as number) < 0) {
+          errors.push("ltm.gitLearnMinDiffChars: must be a non-negative integer");
+        }
+      }
+      if ("gitLearnFileFilter" in ltm && !Array.isArray(ltm["gitLearnFileFilter"])) {
+        errors.push("ltm.gitLearnFileFilter: must be an array");
+      }
+      if ("gitLearnIgnorePatterns" in ltm && !Array.isArray(ltm["gitLearnIgnorePatterns"])) {
+        errors.push("ltm.gitLearnIgnorePatterns: must be an array");
       }
       if ("injectTopN" in ltm) {
         const n = ltm["injectTopN"];
@@ -180,8 +203,12 @@ export async function loadConfig(): Promise<Config> {
       injectTopN:   ltm.injectTopN   ?? DEFAULTS.ltm.injectTopN,
       autoRelate:         ltm.autoRelate         ?? DEFAULTS.ltm.autoRelate,
       graphReasoning:     ltm.graphReasoning     ?? DEFAULTS.ltm.graphReasoning,
-      evaluateSessionLlm: ltm.evaluateSessionLlm ?? DEFAULTS.ltm.evaluateSessionLlm,
-      semanticFallback:   ltm.semanticFallback   ?? DEFAULTS.ltm.semanticFallback,
+      evaluateSessionLlm:     ltm.evaluateSessionLlm     ?? DEFAULTS.ltm.evaluateSessionLlm,
+      semanticFallback:       ltm.semanticFallback       ?? DEFAULTS.ltm.semanticFallback,
+      gitLearnEnabled:        ltm.gitLearnEnabled        ?? DEFAULTS.ltm.gitLearnEnabled,
+      gitLearnMinDiffChars:   ltm.gitLearnMinDiffChars   ?? DEFAULTS.ltm.gitLearnMinDiffChars,
+      gitLearnFileFilter:     ltm.gitLearnFileFilter     ?? DEFAULTS.ltm.gitLearnFileFilter,
+      gitLearnIgnorePatterns: ltm.gitLearnIgnorePatterns ?? DEFAULTS.ltm.gitLearnIgnorePatterns,
     },
     server: {
       apiPort: server.apiPort ?? DEFAULTS.server.apiPort,

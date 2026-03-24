@@ -1,2 +1,5 @@
 [test]
-exclude = ["graph-app/**"]
+preload = []
+
+# Exclude graph-app Playwright tests from bun test (use bun run test:e2e instead)
+# Note: Bun does not support an "exclude" key — use --path-ignore-patterns in the test script

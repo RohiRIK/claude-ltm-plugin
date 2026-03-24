@@ -4,8 +4,8 @@ import { join } from "path";
 import { resolveProject, PROJECTS_DIR, CLAUDE_DIR, getDbPath } from "../lib/resolveProject.js";
 import { logHook } from "../lib/hookLogger.js";
 import { learn } from "../../src/db.js";
-import { getLlmConfig, callLlm } from "../../src/embeddings.js";
 import { addItem } from "../../src/context.js";
+import { extractAndLearn } from "../lib/llmExtract.js";
 import { readConfigSync } from "../../src/config.js";
 import type { Config } from "../../src/config.js";
 
@@ -91,38 +91,8 @@ function extractAssistantText(messages: any[]): string {
 }
 
 async function runLlmExtraction(text: string, projectName: string, sessionId?: string): Promise<void> {
-  const cfg = getLlmConfig();
-  if (!cfg) return;
-
-  const SYSTEM = `Extract from Claude session messages. Return ONLY valid JSON:
-{"decisions":["..."],"gotchas":["..."],"patterns":["..."],"progress":"..."}
-- decisions: architectural choices made (max 5, <120 chars each)
-- gotchas: problems hit and how fixed (max 5, <120 chars each)
-- patterns: reusable patterns discovered (max 5, <120 chars each)
-- progress: single sentence of what was accomplished
-Empty array if nothing found. No markdown fences.`;
-
-  const raw = await callLlm(cfg, text, { systemPrompt: SYSTEM, maxTokens: 800, raw: true });
-  if (!raw) return;
-
-  let extracted: { decisions: string[]; gotchas: string[]; patterns: string[]; progress: string };
-  try {
-    extracted = JSON.parse(raw.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim());
-  } catch { return; }
-
-  const LEARN_ITEMS: Array<{ key: keyof typeof extracted; category: import("../../src/db.js").MemoryCategory; importance: number }> = [
-    { key: "decisions", category: "architecture", importance: 3 },
-    { key: "gotchas",   category: "gotcha",       importance: 4 },
-    { key: "patterns",  category: "pattern",       importance: 3 },
-  ];
-  for (const { key, category, importance } of LEARN_ITEMS) {
-    for (const item of ((extracted[key] as string[]) ?? []).slice(0, 5)) {
-      if (item.length > 10)
-        learn({ content: item, category, importance, project_scope: projectName, source: "evaluate-session", skipExport: true });
-    }
-  }
-  if (extracted.progress?.length > 5)
-    addItem(projectName, "progress", extracted.progress, sessionId);
+  const progress = await extractAndLearn(text, projectName, { source: "evaluate-session", sessionId });
+  if (progress) addItem(projectName, "progress", progress, sessionId);
 }
 
 async function main() {
