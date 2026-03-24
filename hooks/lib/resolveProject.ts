@@ -22,9 +22,7 @@ export const REGISTRY_PATH = join(PROJECTS_DIR, "registry.json");
 export function getDbPath(): string {
   return (
     process.env.LTM_DB_PATH ??
-    (process.env.CLAUDE_PLUGIN_ROOT
-      ? join(process.env.CLAUDE_PLUGIN_ROOT, "data", "ltm.db")
-      : join(CLAUDE_DIR, "memory", "ltm.db"))
+    join(CLAUDE_DIR, "memory", "ltm.db")
   );
 }
 

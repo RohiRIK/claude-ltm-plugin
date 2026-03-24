@@ -5,10 +5,7 @@
   "mcpServers": {
     "ltm": {
       "command": "bun",
-      "args": ["run", "${CLAUDE_PLUGIN_ROOT}/src/mcp-server.ts"],
-      "env": {
-        "LTM_DB_PATH": "${CLAUDE_PLUGIN_ROOT}/data/ltm.db"
-      }
+      "args": ["run", "${CLAUDE_PLUGIN_ROOT}/src/mcp-server.ts"]
     }
   },
   "skills": "./skills/"

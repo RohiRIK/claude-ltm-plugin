@@ -43,11 +43,7 @@ export interface Config {
 
 const DEFAULTS: Config = {
   ltm: {
-    dbPath:
-      process.env.LTM_DB_PATH ??
-      (process.env.CLAUDE_PLUGIN_ROOT
-        ? join(process.env.CLAUDE_PLUGIN_ROOT, "data", "ltm.db")
-        : join(homedir(), ".claude", "memory", "ltm.db")),
+    dbPath: process.env.LTM_DB_PATH ?? join(homedir(), ".claude", "memory", "ltm.db"),
     decayEnabled: true,
     injectTopN: 15,
     autoRelate: true,
