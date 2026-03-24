@@ -10,6 +10,67 @@ Long-Term Memory (LTM) plugin for Claude Code. Provides persistent semantic memo
 - **Memory graph** — Next.js visualizer with cluster detection and relationship traversal
 - **Secrets scrubber** — strips API keys and tokens before writing to DB
 
+## Installation
+
+### One-liner (recommended)
+
+```bash
+claude plugin marketplace add https://github.com/RohiRIK/claude-ltm-plugin && claude plugin install claude-ltm
+```
+
+Then restart Claude Code. The plugin will:
+- Register the `ltm` MCP server automatically
+- Wire up `SessionStart`, `Stop`, and `PreCompact` hooks
+- Make LTM skills available as `/claude-ltm:ContinuousLearning` etc.
+
+### First-time setup: copy your database
+
+If you already have an `ltm.db` from a previous setup:
+
+```bash
+cp ~/.claude/memory/ltm.db ~/.claude/plugins/cache/claude-ltm/claude-ltm/*/data/ltm.db
+```
+
+Otherwise a fresh database is created automatically on first run.
+
+---
+
+## Verifying it works
+
+After install + restart, run these checks:
+
+### 1. MCP server is live
+```
+/doctor
+```
+Look for `ltm` in the MCP servers list with status ✔.
+
+### 2. Recall works
+```
+/recall test
+```
+Should return memories (or "no results" if DB is empty — that's fine).
+
+### 3. Learn works
+```
+/learn "LTM plugin installed successfully"
+```
+Should confirm the memory was stored.
+
+### 4. Context injection fires at session start
+Start a new Claude Code session. You should see a `## Restored Project Context` block and an `LTM:` section injected at the top.
+
+### 5. Graph visualizer (optional)
+```bash
+cd ~/.claude/plugins/cache/claude-ltm/claude-ltm/*/graph-app
+bun dev --port 7332
+# In a second terminal:
+LTM_DB_PATH=../data/ltm.db bun run ../src/graph-server.ts
+```
+Open http://localhost:7332 to see your memory graph.
+
+---
+
 ## Structure
 
 ```
@@ -22,23 +83,6 @@ data/ltm.db       SQLite database (user data, not committed)
 migrations/       SQL schema migrations
 ```
 
-## Installation
-
-### As a local plugin
-
-```bash
-git clone https://github.com/RohiRIK/claude-ltm-plugin ~/Projects/claude-ltm-plugin
-# Plugin registration depends on your Claude Code plugin manager
-```
-
-### Manual MCP registration
-
-```bash
-claude mcp add ltm bun -- run ~/Projects/claude-ltm-plugin/src/mcp-server.ts --scope user
-```
-
-Set `LTM_DB_PATH` env var to point to your database (default: `data/ltm.db` relative to plugin root).
-
 ## MCP Tools
 
 | Tool | Description |
@@ -50,15 +94,6 @@ Set `LTM_DB_PATH` env var to point to your database (default: `data/ltm.db` rela
 | `ltm_graph` | Traverse memory graph |
 | `ltm_context` | Get per-project context items |
 
-## Graph Visualizer
-
-```bash
-cd graph-app
-bun dev --port 7332
-# API server
-LTM_DB_PATH=../data/ltm.db bun run ../src/graph-server.ts
-```
-
 ## Configuration
 
 Configure via `~/.claude/config.json`:
@@ -66,7 +101,6 @@ Configure via `~/.claude/config.json`:
 ```json
 {
   "ltm": {
-    "dbPath": "~/Projects/claude-ltm-plugin/data/ltm.db",
     "decayEnabled": true,
     "injectTopN": 15,
     "semanticFallback": true,
@@ -75,3 +109,5 @@ Configure via `~/.claude/config.json`:
   }
 }
 ```
+
+The database lives at `<plugin-install-dir>/data/ltm.db` by default. Override with `LTM_DB_PATH` env var.
