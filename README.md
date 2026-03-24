@@ -1,16 +1,53 @@
-# claude-ltm-plugin
+```
+╔══════════════════════════════════════════════════════════════╗
+║                                                              ║
+║   🧠  claude-ltm-plugin  ·  v1.1.0                          ║
+║                                                              ║
+║   Long-Term Memory for Claude Code                          ║
+║   Memories that survive every session, every update         ║
+║                                                              ║
+╚══════════════════════════════════════════════════════════════╝
+```
 
-Long-Term Memory (LTM) plugin for Claude Code. Provides persistent semantic memory across sessions with FTS5 + vector search, automatic context injection, session learning, and a graph visualizer.
+Persistent semantic memory for Claude Code. FTS5 + vector search, automatic context injection, session learning, and a memory graph visualizer — all packaged as a zero-config plugin.
 
-## Features
+---
 
-- **Semantic memory** — store and retrieve memories with FTS5 full-text search + embedding fallback
-- **Context injection** — SessionStart hook injects relevant memories at the start of every session
-- **Session learning** — EvaluateSession hook auto-extracts patterns, errors, and decisions from transcripts
-- **Memory graph** — Next.js visualizer with cluster detection and relationship traversal
-- **Secrets scrubber** — strips API keys and tokens before writing to DB
+## How it works
 
-## Installation
+```
+┌─────────────────────────────────────────────────────────────┐
+│                       Claude Code                           │
+│                                                             │
+│   ┌──────────────┐  ┌──────────────┐  ┌────────────────┐  │
+│   │  12 Commands │  │   3 Skills   │  │   4 Hooks      │  │
+│   │  /recall     │  │  Continuous  │  │  SessionStart  │  │
+│   │  /learn      │  │  Learning    │  │  Stop ×2       │  │
+│   │  /capture    │  │  LtmServer   │  │  PreCompact    │  │
+│   │  /forget     │  │  Learned     │  │                │  │
+│   │  + 8 more    │  │              │  │                │  │
+│   └──────┬───────┘  └──────┬───────┘  └───────┬────────┘  │
+│          └─────────────────┴──────────────────┘           │
+│                             │                               │
+│                    ┌────────▼────────┐                     │
+│                    │   ltm MCP       │                     │
+│                    │   server        │                     │
+│                    └────────┬────────┘                     │
+└─────────────────────────────┼───────────────────────────────┘
+                               │
+                    ┌──────────▼──────────┐
+                    │      ltm.db         │
+                    │  ┌───────────────┐  │
+                    │  │   memories    │  │
+                    │  │ context_items │  │
+                    │  │  relations    │  │
+                    │  └───────────────┘  │
+                    └─────────────────────┘
+```
+
+---
+
+## Install
 
 ### Marketplace (recommended)
 
@@ -19,86 +56,143 @@ claude plugin marketplace add https://github.com/RohiRIK/claude-ltm-plugin
 claude plugin install ltm
 ```
 
-Then restart Claude Code. The plugin auto-wires:
-- `ltm` MCP server
-- `SessionStart`, `Stop`, and `PreCompact` hooks
-- LTM skills (`/ltm:ContinuousLearning` etc.)
-- Database at `~/.claude/plugins/data/ltm/ltm.db` (persists across updates)
+Restart Claude Code. Done.
 
-### Dev / git-clone flow
+```
+claude plugin install ltm
+         │
+         ▼
+  ┌──────────────────────────────────┐
+  │  Plugin system sets:             │
+  │  CLAUDE_PLUGIN_ROOT → code       │
+  │  CLAUDE_PLUGIN_DATA → your data  │
+  └──────────┬───────────────────────┘
+             │
+             ├──▶ MCP server auto-wired    ✓
+             ├──▶ 4 hooks auto-wired       ✓
+             ├──▶ 12 commands loaded       ✓
+             ├──▶ 3 skills loaded          ✓
+             ├──▶ CLAUDE.md loaded         ✓
+             └──▶ ltm.db migrated/created  ✓
+                          │
+                   restart Claude Code
+                          │
+                          ▼
+                     ✅  ready
+           /ltm:recall  ·  /ltm:learn  ·  /doctor
+```
+
+### Dev / git clone
 
 ```bash
 git clone https://github.com/RohiRIK/claude-ltm-plugin ~/Projects/claude-ltm-plugin
 cd ~/Projects/claude-ltm-plugin && bash install.sh
 ```
 
-Database lives at `~/.claude/memory/ltm.db` in this mode.
+---
+
+## Session lifecycle
+
+```
+  ┌─────────────────────────────────────────────────────────┐
+  │  Session Start                                          │
+  │    SessionStart hook fires                              │
+  │      ├─ inject top memories (importance ≥ 3)           │
+  │      ├─ inject context: goal, decisions, gotchas        │
+  │      └─ Claude reads CLAUDE.md → knows available tools  │
+  └─────────────────────┬───────────────────────────────────┘
+                         │
+                  ← work happens →
+                         │
+  ┌──────────────────────▼──────────────────────────────────┐
+  │  Session Stop                                           │
+  │    UpdateContext hook  → saves progress to context_items│
+  │    EvaluateSession     → extracts patterns from         │
+  │                          transcript → stores memories   │
+  └─────────────────────────────────────────────────────────┘
+                         │
+              (context window fills)
+                         │
+  ┌──────────────────────▼──────────────────────────────────┐
+  │  PreCompact                                             │
+  │    Snapshots context_items → context-summary.md         │
+  │    Injected at next SessionStart even after compaction  │
+  └─────────────────────────────────────────────────────────┘
+```
 
 ---
 
-## Verifying it works
+## Database
 
-After install + restart:
+Your memories are stored outside the plugin code — they survive `claude plugin update`.
 
-### 1. MCP server is live
 ```
-/doctor
-```
-Look for `ltm` in the MCP servers list with status ✔.
+  getDbPath() resolution:
+  ─────────────────────────────────────────────────────
+  1. LTM_DB_PATH env var          → use it (override)
+  2. CLAUDE_PLUGIN_DATA/ltm.db    → marketplace install
+  3. ~/.claude/memory/ltm.db      → dev / git clone
+  ─────────────────────────────────────────────────────
 
-### 2. Recall works
+  On first marketplace install:
+  ~/.claude/memory/ltm.db exists?
+    yes → copied to CLAUDE_PLUGIN_DATA/ltm.db  ← memories preserved
+    no  → fresh db created on first run
 ```
-/recall test
-```
-Should return memories (or "no results" if DB is empty — that's fine).
-
-### 3. Learn works
-```
-/learn "LTM plugin installed successfully"
-```
-Should confirm the memory was stored.
-
-### 4. Context injection fires at session start
-Start a new Claude Code session. You should see a `## Restored Project Context` block and an `LTM:` section injected at the top.
-
-### 5. Graph visualizer (optional)
-```bash
-cd ~/.claude/plugins/cache/ltm/ltm/*/graph-app
-bun dev --port 7332
-# In a second terminal:
-bun run ../src/graph-server.ts
-```
-Open http://localhost:7332 to see your memory graph.
 
 ---
 
-## Structure
+## Commands
 
-```
-src/              TypeScript source (MCP server + DB layer)
-hooks/src/        Session lifecycle hooks (bun-native TypeScript)
-hooks/hooks.json  Hook registrations (auto-wired on install)
-scripts/          Install utilities
-skills/           Claude Code skills
-graph-app/        Next.js graph visualizer (port 7332)
-migrations/       SQL schema migrations
-```
+Available as `/ltm:<command>` after install.
+
+| Command | What it does |
+|---------|-------------|
+| `/ltm:recall` | Search memories (FTS5 + semantic fallback) |
+| `/ltm:learn` | Store a memory or extract from session |
+| `/ltm:forget` | Delete a memory by ID |
+| `/ltm:relate` | Link two memories with a typed relationship |
+| `/ltm:capture` | Save context item + LTM memory in one shot |
+| `/ltm:init-context` | Seed a new project goal |
+| `/ltm:decay-report` | Memory health + score distribution |
+| `/ltm:migrate` | Schema migration control |
+| `/ltm:hook-doctor` | Hook health diagnostic |
+| `/ltm:secrets-scan` | Scan memories for secrets, redact in-place |
+| `/ltm:ltm-server` | Start/stop memory graph visualizer |
+| `/ltm:health` | Project health scores dashboard |
+
+---
 
 ## MCP Tools
 
 | Tool | Description |
 |------|-------------|
-| `ltm_recall` | Search memories with FTS5 + semantic fallback |
-| `ltm_learn` | Store a new memory |
-| `ltm_relate` | Create a relationship between memories |
-| `ltm_forget` | Delete a memory |
+| `ltm_recall` | Search memories — FTS5 + semantic fallback |
+| `ltm_learn` | Store or reinforce a memory |
+| `ltm_forget` | Delete a memory (CASCADE removes relations) |
+| `ltm_relate` | Create typed graph relationship |
 | `ltm_graph` | Traverse memory graph |
-| `ltm_context` | Get per-project context items |
+| `ltm_context` | Get full project context |
 | `ltm_context_items` | List context items by type |
+
+---
+
+## Hooks
+
+Auto-wired on install. No manual setup.
+
+| Hook | File | What it does |
+|------|------|-------------|
+| `SessionStart` | `hooks/src/SessionStart.ts` | Injects memories + context into session |
+| `Stop` | `hooks/src/UpdateContext.ts` | Saves session progress |
+| `Stop` | `hooks/src/EvaluateSession.ts` | Extracts patterns from transcript |
+| `PreCompact` | `hooks/src/PreCompact.ts` | Snapshots context before compaction |
+
+---
 
 ## Configuration
 
-Configure via `~/.claude/config.json`:
+`~/.claude/config.json`:
 
 ```json
 {
@@ -112,7 +206,38 @@ Configure via `~/.claude/config.json`:
 }
 ```
 
-**Database path priority:**
-1. `LTM_DB_PATH` env var (explicit override)
-2. `CLAUDE_PLUGIN_DATA/ltm.db` (marketplace install — set automatically)
-3. `~/.claude/memory/ltm.db` (dev/install.sh fallback)
+---
+
+## Verify install
+
+```
+/doctor         → ltm MCP shows ✔
+/ltm:recall test → returns results (or "no results" — fine on fresh install)
+```
+
+Start a new session — you should see `## Restored Project Context` injected at the top.
+
+---
+
+## Docs
+
+- [Architecture](docs/architecture.md) — technical deep-dive
+- [Commands](docs/commands.md) — full command reference
+- [Configuration](docs/configuration.md) — all config options
+- [Migration](docs/migration.md) — upgrading from old `~/.claude/memory/` setup
+
+---
+
+## Structure
+
+```
+src/              MCP server + DB layer (bun-native TypeScript)
+hooks/src/        Session lifecycle hooks
+hooks/hooks.json  Hook registrations (auto-wired on install)
+commands/         12 slash commands (/ltm:recall etc.)
+skills/           3 Claude Code skills
+scripts/          install-wiring.ts
+graph-app/        Next.js memory graph visualizer (port 7332)
+migrations/       SQL schema migrations
+CLAUDE.md         Loaded by Claude — tool reference
+```
