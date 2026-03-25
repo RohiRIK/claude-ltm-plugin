@@ -4,6 +4,7 @@ import { join } from "path";
 import { resolveProject, registerPath, PROJECTS_DIR, CLAUDE_DIR, getDbPath } from "../lib/resolveProject.js";
 import { readStdin, parseHookInput, trimToLines } from "../lib/hookUtils.js";
 import { logHook } from "../lib/hookLogger.js";
+import { spawnSync } from "child_process";
 import { getContextMerge, getSimilarMemories, getContextMergeWithGraph } from "../../src/db.js";
 import { embedText } from "../../src/embeddings.js";
 import { getDb } from "../../src/shared-db.js";
@@ -88,7 +89,20 @@ async function buildLtmSection(project: string, sessionContext?: string): Promis
   }
 }
 
+function refreshMarketplaceClone(): void {
+  const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT;
+  if (!pluginRoot) return;
+  // Fire-and-forget git fetch so `claude plugin update` sees the latest version
+  spawnSync("git", ["fetch", "--quiet"], {
+    cwd: pluginRoot,
+    stdio: "ignore",
+    timeout: 5000,
+  });
+}
+
 async function main(): Promise<void> {
+  refreshMarketplaceClone();
+
   // Run pending LTM schema migrations before anything else
   try {
     const results = await runPendingMigrations();
