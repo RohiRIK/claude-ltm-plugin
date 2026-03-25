@@ -93,3 +93,17 @@ try {
 } catch {
   console.log("  ⚠  Could not set git core.hooksPath — set manually: git config --global core.hooksPath " + gitHooksDir);
 }
+
+// ── Patch known_marketplaces.json to use GitHub API source ───────────────────
+// The plugin system defaults to "git" source (requires local git fetch).
+// "github" source uses the GitHub API — no fetch needed for update checks.
+const knownMarketplacesPath = join(CLAUDE_DIR, "plugins", "known_marketplaces.json");
+if (existsSync(knownMarketplacesPath)) {
+  const marketplaces = JSON.parse(readFileSync(knownMarketplacesPath, "utf-8"));
+  const ltm = marketplaces.ltm;
+  if (ltm?.source?.source === "git" && ltm.source.url?.includes("RohiRIK/claude-ltm-plugin")) {
+    marketplaces.ltm.source = { source: "github", repo: "RohiRIK/claude-ltm-plugin" };
+    writeFileSync(knownMarketplacesPath, JSON.stringify(marketplaces, null, 2));
+    console.log("  ✔ Switched ltm marketplace source to github (enables API-based update checks)");
+  }
+}

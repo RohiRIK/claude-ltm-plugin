@@ -1,7 +1,7 @@
 ```
 ╔══════════════════════════════════════════════════════════════╗
 ║                                                              ║
-║   🧠  claude-ltm-plugin  ·  v1.3.3                          ║
+║   🧠  claude-ltm-plugin  ·  v1.3.4                          ║
 ║                                                              ║
 ║   Long-Term Memory for Claude Code                          ║
 ║   Memories that survive every session, every update         ║
