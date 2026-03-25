@@ -1,0 +1,26 @@
+---
+description: "Check and migrate ltm.db from legacy ~/.claude/memory/ path to the marketplace plugin data directory."
+---
+
+Run and display output verbatim:
+
+```bash
+bun "${CLAUDE_PLUGIN_ROOT}/scripts/migrate-db.ts"
+```
+
+If `CLAUDE_PLUGIN_ROOT` is unset, find plugin root: `claude plugin info ltm 2>/dev/null | grep -i path | head -1`.
+
+## What it checks
+
+| Scenario | Result |
+|----------|--------|
+| `LTM_DB_PATH` env set | Shows override path, no migration needed |
+| Marketplace install, DB already migrated | Confirms target path and size |
+| Marketplace install, legacy DB exists | Copies `~/.claude/memory/ltm.db` → `$CLAUDE_PLUGIN_DATA/ltm.db` |
+| Marketplace install, fresh | Confirms where DB will be created |
+| Dev/git-clone install | Shows `~/.claude/memory/ltm.db`, no migration needed |
+
+## After migration
+
+The legacy DB at `~/.claude/memory/ltm.db` is kept intact — delete it manually if desired.
+All hooks and MCP tools automatically use the new path via `getDbPath()`.

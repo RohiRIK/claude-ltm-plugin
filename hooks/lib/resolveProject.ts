@@ -11,7 +11,7 @@
  * Format: { "/abs/path": "friendly-name" }
  */
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, copyFileSync } from "fs";
 import { join, sep } from "path";
 import { homedir } from "os";
 
@@ -20,10 +20,17 @@ export const PROJECTS_DIR = join(CLAUDE_DIR, "projects");
 export const REGISTRY_PATH = join(PROJECTS_DIR, "registry.json");
 
 export function getDbPath(): string {
-  return (
-    process.env.LTM_DB_PATH ??
-    join(CLAUDE_DIR, "memory", "ltm.db")
-  );
+  if (process.env.LTM_DB_PATH) return process.env.LTM_DB_PATH;
+  if (process.env.CLAUDE_PLUGIN_DATA) {
+    const targetDb = join(process.env.CLAUDE_PLUGIN_DATA, "ltm.db");
+    const legacyDb = join(CLAUDE_DIR, "memory", "ltm.db");
+    if (!existsSync(targetDb) && existsSync(legacyDb)) {
+      mkdirSync(process.env.CLAUDE_PLUGIN_DATA, { recursive: true });
+      copyFileSync(legacyDb, targetDb);
+    }
+    return targetDb;
+  }
+  return join(CLAUDE_DIR, "memory", "ltm.db");
 }
 
 export interface ProjectResolution {

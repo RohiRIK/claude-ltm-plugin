@@ -1,7 +1,7 @@
 ```
 ╔══════════════════════════════════════════════════════════════╗
 ║                                                              ║
-║   🧠  claude-ltm-plugin  ·  v1.1.0                          ║
+║   🧠  claude-ltm-plugin  ·  v1.3.0                          ║
 ║                                                              ║
 ║   Long-Term Memory for Claude Code                          ║
 ║   Memories that survive every session, every update         ║
@@ -234,7 +234,7 @@ Start a new session — you should see `## Restored Project Context` injected at
 src/              MCP server + DB layer (bun-native TypeScript)
 hooks/src/        Session lifecycle hooks
 hooks/hooks.json  Hook registrations (auto-wired on install)
-commands/         12 slash commands (/ltm:recall etc.)
+commands/         13 slash commands (/ltm:recall etc.)
 skills/           3 Claude Code skills
 scripts/          install-wiring.ts
 graph-app/        Next.js memory graph visualizer (port 7332)
