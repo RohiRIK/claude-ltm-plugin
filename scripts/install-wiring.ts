@@ -38,16 +38,16 @@ if (pluginData) {
 const settingsJson = join(CLAUDE_DIR, "settings.json");
 
 // ── MCP registration ─────────────────────────────────────────────────────────
-if (!existsSync(claudeJson)) writeFileSync(claudeJson, "{}");
-const claude = JSON.parse(readFileSync(claudeJson, "utf-8"));
-claude.mcpServers ??= {};
-claude.mcpServers.ltm = {
-  type: "stdio",
-  command: "bun",
-  args: ["run", `${root}/src/mcp-server.ts`],
-};
-writeFileSync(claudeJson, JSON.stringify(claude, null, 2));
-console.log("  ✔ MCP server registered in ~/.claude.json");
+// MCP is registered by the plugin system via plugin.json mcpServers field.
+// We only clean up any legacy manual entry left from pre-plugin installs.
+if (existsSync(claudeJson)) {
+  const claude = JSON.parse(readFileSync(claudeJson, "utf-8"));
+  if (claude.mcpServers?.ltm) {
+    delete claude.mcpServers.ltm;
+    writeFileSync(claudeJson, JSON.stringify(claude, null, 2));
+    console.log("  ✔ Removed legacy ltm MCP entry from ~/.claude.json (now managed by plugin system)");
+  }
+}
 
 // ── Hooks wiring ─────────────────────────────────────────────────────────────
 type HookEntry = { matcher: string; hooks: { type: string; command: string }[] };
