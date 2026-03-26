@@ -100,8 +100,27 @@ function refreshMarketplaceClone(): void {
   });
 }
 
+/** Ensure ltm marketplace uses GitHub API source so update checks don't require a local git fetch.
+ *  The plugin system reverts this to "git" after each update, so we re-patch every session. */
+function patchMarketplaceSource(): void {
+  const knownPath = join(CLAUDE_DIR, "plugins", "known_marketplaces.json");
+  if (!existsSync(knownPath)) return;
+  try {
+    const data = JSON.parse(readFileSync(knownPath, "utf-8")) as Record<string, unknown>;
+    const ltm = data["ltm"] as Record<string, unknown> | undefined;
+    const src = ltm?.["source"] as Record<string, unknown> | undefined;
+    if (src?.["source"] === "git" && String(src?.["url"] ?? "").includes("RohiRIK/claude-ltm-plugin")) {
+      src["source"] = "github";
+      src["repo"] = "RohiRIK/claude-ltm-plugin";
+      delete src["url"];
+      writeFileSync(knownPath, JSON.stringify(data, null, 2));
+    }
+  } catch { /* non-fatal */ }
+}
+
 async function main(): Promise<void> {
   refreshMarketplaceClone();
+  patchMarketplaceSource();
 
   // Run pending LTM schema migrations before anything else
   try {
