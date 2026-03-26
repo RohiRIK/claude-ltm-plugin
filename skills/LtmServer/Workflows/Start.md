@@ -31,7 +31,7 @@ echo "Ports 7331 and 7332 cleared"
 
 ```bash
 mkdir -p "$HOME/.claude/tmp"
-nohup bun "$HOME/.claude/memory/server.ts" \
+nohup bun "${CLAUDE_PLUGIN_ROOT}/src/server.ts" \
   > "$HOME/.claude/tmp/ltm-server.log" 2>&1 &
 echo $! > "$HOME/.claude/tmp/ltm-server.pid"
 sleep 0.5
@@ -42,7 +42,7 @@ echo "API started on http://localhost:7331"
 
 ```bash
 tmux new-session -d -s ltm-ui -x 220 -y 50 \
-  'cd "$HOME/.claude/memory/graph-app" && NEXT_PUBLIC_WS_URL=ws://localhost:7331 bun dev --port 7332'
+  "cd '${CLAUDE_PLUGIN_ROOT}/graph-app' && NEXT_PUBLIC_WS_URL=ws://localhost:7331 bun dev --port 7332"
 echo "Next.js starting in tmux session 'ltm-ui'"
 ```
 
@@ -57,7 +57,7 @@ open "http://localhost:7332"
 1. **Build Next.js app**
 
 ```bash
-cd "$HOME/.claude/memory/graph-app"
+cd "${CLAUDE_PLUGIN_ROOT}/graph-app"
 bun run build
 ```
 
@@ -65,7 +65,7 @@ bun run build
 
 ```bash
 mkdir -p "$HOME/.claude/tmp"
-nohup bun "$HOME/.claude/memory/server.ts" \
+nohup bun "${CLAUDE_PLUGIN_ROOT}/src/server.ts" \
   > "$HOME/.claude/tmp/ltm-server.log" 2>&1 &
 echo $! > "$HOME/.claude/tmp/ltm-server.pid"
 sleep 0.5

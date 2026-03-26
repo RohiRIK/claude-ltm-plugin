@@ -18,8 +18,8 @@ Obsidian-style force graph at **http://localhost:7332** visualizing `ltm.db`.
 | API + WebSocket | `:7331` — Next.js proxies `/api/*` here |
 | PID file | `~/.claude/tmp/ltm-server.pid` |
 | Log file | `~/.claude/tmp/ltm-server.log` |
-| Server | `~/.claude/memory/server.ts` |
-| UI source | `~/.claude/memory/graph-app/` |
+| Server | `${CLAUDE_PLUGIN_ROOT}/src/server.ts` |
+| UI source | `${CLAUDE_PLUGIN_ROOT}/graph-app/` |
 
 ## Routing
 
