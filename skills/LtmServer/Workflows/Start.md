@@ -41,9 +41,12 @@ echo "API started on http://localhost:7331"
 2. **Start Next.js dev server (port 7332, HMR enabled) in tmux**
 
 ```bash
-tmux new-session -d -s ltm-ui -x 220 -y 50 \
-  "cd '${CLAUDE_PLUGIN_ROOT}/graph-app' && NEXT_PUBLIC_WS_URL=ws://localhost:7331 bun dev --port 7332"
-echo "Next.js starting in tmux session 'ltm-ui'"
+# Ensure dependencies are installed first
+cd "${CLAUDE_PLUGIN_ROOT}/graph-app" && bun install --frozen-lockfile 2>/dev/null || bun install
+
+nohup bash -c "cd '${CLAUDE_PLUGIN_ROOT}/graph-app' && NEXT_PUBLIC_WS_URL=ws://localhost:7331 PATH='${CLAUDE_PLUGIN_ROOT}/graph-app/node_modules/.bin:$PATH' next dev --port 7332" \
+  > "$HOME/.claude/tmp/nextjs.log" 2>&1 &
+echo "Next.js starting in background (log: ~/.claude/tmp/nextjs.log)"
 ```
 
 3. **Open browser** (wait ~5s for Next.js to compile on first start)

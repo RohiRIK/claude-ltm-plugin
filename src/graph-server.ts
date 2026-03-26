@@ -176,7 +176,6 @@ function deepMerge(base: Record<string, unknown>, patch: Record<string, unknown>
   return out;
 }
 const SCHEMA_PATH = join(CLAUDE_DIR, "memory", "schema.sql");
-const UI_PATH = join(CLAUDE_DIR, "memory", "graph-ui", "index.html");
 const PID_PATH = join(CLAUDE_DIR, "tmp", "ltm-server.pid");
 const PORT = 7331;
 
@@ -470,6 +469,217 @@ function searchMemories(q: string) {
   }
 }
 
+// ─── Config Explorer ─────────────────────────────────────────────────────────
+
+import { readdirSync } from "fs";
+
+interface SkillEntry {
+  name: string;
+  description: string;
+  slashCommand?: string;
+  triggerPhrases: string[];
+  workflows: string[];
+  path: string;
+}
+
+interface AgentEntry {
+  name: string;
+  description: string;
+  whenToUse: string;
+  path: string;
+}
+
+interface HookEntry {
+  event: string;
+  matcher?: string;
+  description: string;
+}
+
+interface RuleEntry {
+  name: string;
+  summary: string;
+  path: string;
+}
+
+function parseSkills(): SkillEntry[] {
+  const skillsDir = join(CLAUDE_DIR, "skills");
+  if (!existsSync(skillsDir)) return [];
+
+  const entries: SkillEntry[] = [];
+  let dirs: string[] = [];
+  try { dirs = readdirSync(skillsDir, { withFileTypes: true }).filter(d => d.isDirectory()).map(d => d.name); }
+  catch { return []; }
+
+  for (const dir of dirs) {
+    const skillPath = join(skillsDir, dir, "SKILL.md");
+    if (!existsSync(skillPath)) continue;
+    let raw = "";
+    try { raw = readFileSync(skillPath, "utf-8"); } catch { continue; }
+
+    // Extract frontmatter name/description
+    const fmMatch = raw.match(/^---\n([\s\S]*?)\n---/);
+    let name = dir;
+    let description = "";
+    if (fmMatch) {
+      const nameM = fmMatch[1].match(/^name:\s*(.+)$/m);
+      const descM = fmMatch[1].match(/^description:\s*(.+)$/m);
+      if (nameM) name = nameM[1].trim();
+      if (descM) description = descM[1].trim();
+    }
+    if (!description) {
+      // Fallback: first non-empty, non-heading line
+      const line = raw.split("\n").find(l => l.trim() && !l.startsWith("#") && !l.startsWith("---") && !l.startsWith("name:") && !l.startsWith("description:"));
+      description = line?.trim() ?? "";
+    }
+
+    // Slash command: any `/word` appearing in the file
+    const cmdM = raw.match(/`(\/[\w-]+)`/);
+    const slashCommand = cmdM ? cmdM[1] : undefined;
+
+    // Trigger phrases: lines after "USE WHEN" or "Trigger"
+    const triggerPhrases: string[] = [];
+    const triggerSection = raw.match(/(?:USE WHEN|Triggers?)[:\s]+([\s\S]*?)(?:\n##|\n---|\n\n\n|$)/i);
+    if (triggerSection) {
+      triggerPhrases.push(
+        ...triggerSection[1]
+          .split("\n")
+          .map(l => l.replace(/^[-*]\s*/, "").trim())
+          .filter(l => l.length > 0 && l.length < 120)
+          .slice(0, 6)
+      );
+    }
+
+    // Workflows: subdirectories named Workflows/
+    const workflowsDir = join(skillsDir, dir, "Workflows");
+    let workflows: string[] = [];
+    if (existsSync(workflowsDir)) {
+      try {
+        workflows = readdirSync(workflowsDir)
+          .filter(f => f.endsWith(".md"))
+          .map(f => f.replace(/\.md$/, ""));
+      } catch { /* empty */ }
+    }
+
+    entries.push({ name, description, slashCommand, triggerPhrases, workflows, path: `skills/${dir}/SKILL.md` });
+  }
+
+  return entries.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function parseAgents(): AgentEntry[] {
+  const agentsDir = join(CLAUDE_DIR, "agents");
+  if (!existsSync(agentsDir)) return [];
+
+  const entries: AgentEntry[] = [];
+  let files: string[] = [];
+  try { files = readdirSync(agentsDir).filter(f => f.endsWith(".md")); }
+  catch { return []; }
+
+  for (const file of files) {
+    const agentPath = join(agentsDir, file);
+    let raw = "";
+    try { raw = readFileSync(agentPath, "utf-8"); } catch { continue; }
+
+    const name = file.replace(/\.md$/, "");
+
+    // Description: first paragraph after the H1 or first non-empty line
+    const lines = raw.split("\n");
+    let description = "";
+    let foundHeading = false;
+    for (const line of lines) {
+      if (line.startsWith("# ")) { foundHeading = true; continue; }
+      if (foundHeading && line.trim()) { description = line.trim(); break; }
+    }
+    if (!description) description = lines.find(l => l.trim() && !l.startsWith("#"))?.trim() ?? "";
+
+    // When to use: content after "When to use" or "Use when" heading
+    let whenToUse = "";
+    const whenMatch = raw.match(/##\s+(?:When to [Uu]se|Use [Ww]hen)[^\n]*\n([\s\S]*?)(?:\n##|$)/);
+    if (whenMatch) {
+      whenToUse = whenMatch[1]
+        .split("\n")
+        .map(l => l.replace(/^[-*]\s*/, "").trim())
+        .filter(l => l.length > 0)
+        .slice(0, 3)
+        .join(" · ");
+    }
+
+    entries.push({ name, description, whenToUse, path: `agents/${file}` });
+  }
+
+  return entries.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function parseHooks(): HookEntry[] {
+  const settingsPath = join(CLAUDE_DIR, "settings.json");
+  if (!existsSync(settingsPath)) return [];
+
+  let settings: Record<string, unknown> = {};
+  try { settings = JSON.parse(readFileSync(settingsPath, "utf-8")) as Record<string, unknown>; }
+  catch { return []; }
+
+  const hooks = settings["hooks"] as Record<string, unknown[]> | undefined;
+  if (!hooks) return [];
+
+  const entries: HookEntry[] = [];
+  for (const [event, hookList] of Object.entries(hooks)) {
+    if (!Array.isArray(hookList)) continue;
+    for (const hook of hookList) {
+      const h = hook as Record<string, unknown>;
+      const matcher = typeof h["matcher"] === "string" ? h["matcher"] : undefined;
+      const hooks2 = Array.isArray(h["hooks"]) ? h["hooks"] as Array<Record<string, unknown>> : [];
+      for (const inner of hooks2) {
+        const cmd = typeof inner["command"] === "string" ? inner["command"] as string : "";
+        // Derive description from command basename or comment patterns
+        const cmdBase = cmd.split("/").pop()?.split(" ")[0] ?? cmd.slice(0, 60);
+        entries.push({ event, matcher, description: cmdBase });
+      }
+      // Flat hook (no nested hooks array)
+      if (hooks2.length === 0 && typeof h["command"] === "string") {
+        const cmd = h["command"] as string;
+        const cmdBase = cmd.split("/").pop()?.split(" ")[0] ?? cmd.slice(0, 60);
+        entries.push({ event, matcher, description: cmdBase });
+      }
+    }
+  }
+  return entries;
+}
+
+function parseRules(): RuleEntry[] {
+  const rulesDir = join(CLAUDE_DIR, "rules");
+  if (!existsSync(rulesDir)) return [];
+
+  const entries: RuleEntry[] = [];
+  let files: string[] = [];
+  try { files = readdirSync(rulesDir).filter(f => f.endsWith(".md")); }
+  catch { return []; }
+
+  for (const file of files) {
+    const rulePath = join(rulesDir, file);
+    let raw = "";
+    try { raw = readFileSync(rulePath, "utf-8"); } catch { continue; }
+
+    const name = file.replace(/\.md$/, "");
+    // Summary: first heading text + first content line
+    const heading = raw.match(/^#\s+(.+)$/m)?.[1]?.trim() ?? name;
+    const firstLine = raw.split("\n").find(l => l.trim() && !l.startsWith("#"))?.trim() ?? "";
+    const summary = firstLine.length > 0 ? firstLine.slice(0, 120) : heading;
+
+    entries.push({ name, summary, path: `rules/${file}` });
+  }
+
+  return entries.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function getConfigExplorer() {
+  return {
+    skills: parseSkills(),
+    agents: parseAgents(),
+    hooks: parseHooks(),
+    rules: parseRules(),
+  };
+}
+
 // WebSocket clients — typed to the minimal interface we actually use
 type WsClient = { send(data: string): void };
 const clients = new Set<WsClient>();
@@ -577,7 +787,7 @@ Bun.serve({
     const url = new URL(req.url);
     const p = url.pathname;
 
-    if (p === "/")                     return new Response(Bun.file(UI_PATH), { headers: { "Content-Type": "text/html; charset=utf-8" } });
+    if (p === "/")                     return new Response(null, { status: 302, headers: { Location: "http://localhost:7332" } });
     if (p === "/api/graph")            return Response.json(getGraphData());
     if (p === "/api/stats")            return Response.json(getStats());
     if (p === "/api/tags")             return Response.json(getTags());
@@ -1132,6 +1342,14 @@ Bun.serve({
       } catch (e) {
         return Response.json({ ok: false, error: String(e) }, { status: 400 });
       }
+    }
+
+    // ============================================================
+    // Config Explorer
+    // ============================================================
+
+    if (p === "/api/config-explorer" && req.method === "GET") {
+      return Response.json(getConfigExplorer());
     }
 
     return new Response("Not found", { status: 404 });
