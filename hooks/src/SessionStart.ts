@@ -19,6 +19,7 @@ const MAX_INJECT_LINES = 60;
 const MAX_LTM_LINES    = 30;
 const MAX_AGE_MS       = 30 * 24 * 60 * 60 * 1000;
 const LTM_REMINDER     = "⚡ LTM MCP live — use mcp__ltm__ltm_recall before tasks, mcp__ltm__ltm_learn after discoveries.\n";
+const LTM_REPO_SLUG    = "RohiRIK/claude-ltm-plugin";
 
 function defaultName(cwd: string): string {
   const last = cwd.replace(/\/$/, "").split("/").pop() ?? "";
@@ -100,22 +101,20 @@ function refreshMarketplaceClone(): void {
   });
 }
 
-/** Ensure ltm marketplace uses GitHub API source so update checks don't require a local git fetch.
- *  The plugin system reverts this to "git" after each update, so we re-patch every session. */
+// The plugin system reverts known_marketplaces.json to source:"git" after each update.
+// "git" requires a local git fetch to detect new versions; "github" uses the API instantly.
+// Re-patching every session ensures update checks always use the faster GitHub API path.
 function patchMarketplaceSource(): void {
   const knownPath = join(CLAUDE_DIR, "plugins", "known_marketplaces.json");
-  if (!existsSync(knownPath)) return;
   try {
     const data = JSON.parse(readFileSync(knownPath, "utf-8")) as Record<string, unknown>;
     const ltm = data["ltm"] as Record<string, unknown> | undefined;
     const src = ltm?.["source"] as Record<string, unknown> | undefined;
-    if (src?.["source"] === "git" && String(src?.["url"] ?? "").includes("RohiRIK/claude-ltm-plugin")) {
-      src["source"] = "github";
-      src["repo"] = "RohiRIK/claude-ltm-plugin";
-      delete src["url"];
+    if (src?.["source"] === "git" && String(src?.["url"] ?? "").includes(LTM_REPO_SLUG)) {
+      data["ltm"] = { ...ltm, source: { source: "github", repo: LTM_REPO_SLUG } };
       writeFileSync(knownPath, JSON.stringify(data, null, 2));
     }
-  } catch { /* non-fatal */ }
+  } catch { /* file missing or malformed — non-fatal, session start must not be blocked */ }
 }
 
 async function main(): Promise<void> {
