@@ -103,7 +103,15 @@ export default function HealthPage() {
             <div className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border)] p-6">
               <div className="flex items-start justify-between gap-6">
                 <div>
+                  <div className="flex items-center justify-between mb-1">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">LTM Health</p>
+                  <button
+                    onClick={() => void loadHealth()}
+                    className="text-[11px] px-2.5 py-1 rounded border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-sky-500/40 transition-colors"
+                  >
+                    ↻ Refresh
+                  </button>
+                </div>
                   {overallScore !== null && (
                     <div className={`text-5xl font-bold mt-1 font-mono ${overallColor}`}>
                       {overallScore}
@@ -160,7 +168,7 @@ export default function HealthPage() {
                   {actionProjects.map((p) => (
                     <div
                       key={p.project}
-                      className="bg-[var(--bg-secondary)] rounded-lg border border-[var(--border)] p-4 flex items-center gap-4"
+                      className={`bg-[var(--bg-secondary)] rounded-lg border p-4 flex items-center gap-4 ${p.status === "neglected" ? "border-red-500/30" : "border-amber-500/30"}`}
                     >
                       <span className="text-base">{statusIcon(p.status)}</span>
                       <div className="flex-1 min-w-0">

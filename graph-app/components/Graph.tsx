@@ -175,7 +175,7 @@ const Graph = forwardRef<GraphHandle, Props>(function Graph(
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const charge = fg.d3Force("charge") as any;
-    charge?.strength(-80);
+    charge?.strength(-50);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const link = fg.d3Force("link") as any;
@@ -187,7 +187,7 @@ const Graph = forwardRef<GraphHandle, Props>(function Graph(
 
     fg.d3Force(
       "collision",
-      forceCollide<FGNode>().radius(n => nodeRadius(n.importance, "is_project" in n, "is_context" in n) + 2)
+      forceCollide<FGNode>().radius(n => nodeRadius(n.importance, "is_project" in n, "is_context" in n) + 4)
     );
     fg.d3Force("cluster", buildClusterForce(clusters ?? [], showClusters));
 
@@ -196,7 +196,7 @@ const Graph = forwardRef<GraphHandle, Props>(function Graph(
     const w = canvas?.width ?? 800;
     const h = canvas?.height ?? 600;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    fg.d3Force("center", forceCenter(w / 2, h / 2).strength(0.08) as any);
+    fg.d3Force("center", forceCenter(w / 2, h / 2).strength(0.15) as any);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 

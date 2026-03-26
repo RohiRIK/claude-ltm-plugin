@@ -498,6 +498,7 @@ interface HookEntry {
 interface RuleEntry {
   name: string;
   summary: string;
+  content: string;
   path: string;
 }
 
@@ -630,15 +631,14 @@ function parseHooks(): HookEntry[] {
       const hooks2 = Array.isArray(h["hooks"]) ? h["hooks"] as Array<Record<string, unknown>> : [];
       for (const inner of hooks2) {
         const cmd = typeof inner["command"] === "string" ? inner["command"] as string : "";
-        // Derive description from command basename or comment patterns
-        const cmdBase = cmd.split("/").pop()?.split(" ")[0] ?? cmd.slice(0, 60);
-        entries.push({ event, matcher, description: cmdBase });
+        const friendly = cmd.replace(/\/Users\/[^/]+/g, "~").slice(0, 80);
+        entries.push({ event, matcher, description: friendly });
       }
       // Flat hook (no nested hooks array)
       if (hooks2.length === 0 && typeof h["command"] === "string") {
         const cmd = h["command"] as string;
-        const cmdBase = cmd.split("/").pop()?.split(" ")[0] ?? cmd.slice(0, 60);
-        entries.push({ event, matcher, description: cmdBase });
+        const friendly = cmd.replace(/\/Users\/[^/]+/g, "~").slice(0, 80);
+        entries.push({ event, matcher, description: friendly });
       }
     }
   }
@@ -665,7 +665,7 @@ function parseRules(): RuleEntry[] {
     const firstLine = raw.split("\n").find(l => l.trim() && !l.startsWith("#"))?.trim() ?? "";
     const summary = firstLine.length > 0 ? firstLine.slice(0, 120) : heading;
 
-    entries.push({ name, summary, path: `rules/${file}` });
+    entries.push({ name, summary, content: raw, path: `rules/${file}` });
   }
 
   return entries.sort((a, b) => a.name.localeCompare(b.name));

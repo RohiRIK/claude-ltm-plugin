@@ -267,6 +267,7 @@ export interface HookEntry {
 export interface RuleEntry {
   name: string;
   summary: string;
+  content: string;
   path: string;
 }
 
