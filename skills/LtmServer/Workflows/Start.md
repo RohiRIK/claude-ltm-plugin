@@ -31,7 +31,7 @@ echo "Ports 7331 and 7332 cleared"
 
 ```bash
 mkdir -p "$HOME/.claude/tmp"
-nohup bun "${CLAUDE_PLUGIN_ROOT}/src/server.ts" \
+nohup bun "${CLAUDE_PLUGIN_ROOT}/src/graph-server.ts" \
   > "$HOME/.claude/tmp/ltm-server.log" 2>&1 &
 echo $! > "$HOME/.claude/tmp/ltm-server.pid"
 sleep 0.5
@@ -65,7 +65,7 @@ bun run build
 
 ```bash
 mkdir -p "$HOME/.claude/tmp"
-nohup bun "${CLAUDE_PLUGIN_ROOT}/src/server.ts" \
+nohup bun "${CLAUDE_PLUGIN_ROOT}/src/graph-server.ts" \
   > "$HOME/.claude/tmp/ltm-server.log" 2>&1 &
 echo $! > "$HOME/.claude/tmp/ltm-server.pid"
 sleep 0.5
