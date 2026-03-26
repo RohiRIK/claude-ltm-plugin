@@ -1,11 +1,17 @@
 "use client";
-import * as d3 from "d3";
-import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
+import { Component, forwardRef, useCallback, useEffect, useImperativeHandle, useRef, type MutableRefObject } from "react";
+import ForceGraph2D from "react-force-graph-2d";
+import type { ForceGraphMethods, NodeObject } from "react-force-graph-2d";
+import { forceCollide, forceCenter } from "d3-force";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
+
+import { buildClusterForce } from "@/lib/clusterForce";
+import { hullPoints } from "@/lib/convexHull";
 import { nodeColor, nodeRadius } from "@/lib/nodeColors";
-import { hullPath } from "@/lib/convexHull";
 import type { Cluster, GraphData, GraphNode } from "@/lib/types";
+
+// ─── Public types ─────────────────────────────────────────────────────────────
 
 export interface GraphHandle {
   zoomToNode: (id: number) => void;
@@ -24,471 +30,383 @@ interface Props {
   onClusterClick?: (clusterId: string) => void;
 }
 
-// Flat node shape for D3 — avoids union extension issues
-interface RawNode {
-  id: number;
-  label: string;
-  content: string;
-  category: string;
-  importance: number;
-  project_scope: string | null;
-  is_project?: boolean;
-  is_context?: boolean;
+// ─── Internal types ───────────────────────────────────────────────────────────
+
+type FGNode = GraphNode & {
   clusterId?: string;
-  // D3 simulation fields
-  x?: number;
-  y?: number;
-  vx?: number;
-  vy?: number;
-  fx?: number | null;
-  fy?: number | null;
-  // Original GraphNode reference
-  _original: GraphNode;
+  x?: number; y?: number;
+  vx?: number; vy?: number;
+  fx?: number | undefined; fy?: number | undefined;
+};
+
+type GraphColors = {
+  isDark: boolean;
+  bg: string;
+  linkStroke: string;
+  labelFill: string;
+  labelFillMuted: string;
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function buildColors(isDark: boolean): GraphColors {
+  return {
+    isDark,
+    bg: isDark ? "#0d1117" : "#f6f8fa",
+    linkStroke: isDark ? "#30363d" : "#d0d7de",
+    labelFill: isDark ? "#e6edf3" : "#1f2328",
+    labelFillMuted: isDark ? "#6b7280" : "#656d76",
+  };
 }
 
-interface RawLink {
-  source: RawNode;
-  target: RawNode;
-  type: string;
-}
-
-/** Build tooltip content using safe DOM methods — no innerHTML */
-function populateTooltip(tip: HTMLDivElement, d: RawNode, isDark: boolean) {
+function populateTooltip(tip: HTMLDivElement, node: FGNode, isDark: boolean): void {
   while (tip.firstChild) tip.removeChild(tip.firstChild);
 
   const cat = document.createElement("div");
   cat.style.cssText = `color:${isDark ? "#6b7280" : "#656d76"};font-size:10px;text-transform:uppercase;letter-spacing:0.05em`;
-  cat.textContent = d.category;
+  cat.textContent = node.category;
   tip.appendChild(cat);
 
   const label = document.createElement("div");
   label.style.cssText = `color:${isDark ? "#e5e7eb" : "#1f2328"};font-weight:600;margin:2px 0`;
-  label.textContent = d.label;
+  label.textContent = node.label;
   tip.appendChild(label);
 
   const preview = document.createElement("div");
   preview.style.cssText = `color:${isDark ? "#9ca3af" : "#656d76"};font-size:10px`;
-  preview.textContent = d.content.length > 120 ? d.content.substring(0, 119) + "…" : d.content;
+  preview.textContent = node.content.length > 120 ? node.content.substring(0, 119) + "…" : node.content;
   tip.appendChild(preview);
 
   const stars = document.createElement("div");
   stars.style.cssText = "color:#f59e0b;font-size:10px;margin-top:4px";
-  stars.textContent = "★".repeat(d.importance) + "☆".repeat(Math.max(0, 5 - d.importance));
+  stars.textContent = "★".repeat(node.importance) + "☆".repeat(Math.max(0, 5 - node.importance));
   tip.appendChild(stars);
 }
 
+// ─── Error boundary ───────────────────────────────────────────────────────────
+
+class GraphErrorBoundary extends Component<
+  { children: React.ReactNode },
+  { error: Error | null }
+> {
+  state = { error: null };
+
+  static getDerivedStateFromError(error: Error): { error: Error } {
+    return { error };
+  }
+
+  render(): React.ReactNode {
+    if (this.state.error) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full gap-2 text-sm text-red-400">
+          <span>Graph render error</span>
+          <button
+            className="text-xs text-sky-400 underline"
+            onClick={() => this.setState({ error: null })}
+          >
+            Reload
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// ─── Core graph component ─────────────────────────────────────────────────────
+
 const Graph = forwardRef<GraphHandle, Props>(function Graph(
-  { data, activeProject, dimmedIds, highlightedIds, clusters, showClusters, onNodeClick, onClusterClick },
+  { data, activeProject, dimmedIds, highlightedIds, clusters, showClusters = true, onNodeClick, onClusterClick },
   ref
 ) {
   const { resolvedTheme } = useTheme();
-  const svgRef = useRef<SVGSVGElement>(null);
-  const simNodesRef = useRef<RawNode[]>([]);
-  const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
-  const simRef = useRef<d3.Simulation<RawNode, RawLink> | null>(null);
-  const tooltipRef = useRef<HTMLDivElement | null>(null);
-  const fitBoundsRef = useRef<(() => void) | null>(null);
   const router = useRouter();
 
+  // Stable refs — updated from props/theme without causing re-renders
+  const fgRef = useRef<ForceGraphMethods<FGNode> | undefined>(undefined);
+  const colorsRef = useRef<GraphColors>(buildColors(true));
+  const dimmedIdsRef = useRef<Set<number> | undefined>(undefined);
+  const highlightedIdsRef = useRef<Set<number> | undefined>(undefined);
+  const activeProjectRef = useRef<string | null>(null);
+  const clustersRef = useRef<Cluster[]>([]);
+  const showClustersRef = useRef(true);
+  const nodesByIdRef = useRef<Map<number, FGNode>>(new Map());
+  const tooltipRef = useRef<HTMLDivElement | null>(null);
+  const mouseRef = useRef({ x: 0, y: 0 });
+  const hoveredRef = useRef<FGNode | null>(null);
+  const onNodeClickRef = useRef(onNodeClick);
+  const onClusterClickRef = useRef(onClusterClick);
+
+  // Keep callback refs fresh without recreating canvas callbacks
+  useEffect(() => { onNodeClickRef.current = onNodeClick; }, [onNodeClick]);
+  useEffect(() => { onClusterClickRef.current = onClusterClick; }, [onClusterClick]);
+  useEffect(() => { colorsRef.current = buildColors(resolvedTheme !== "light"); }, [resolvedTheme]);
+  useEffect(() => { dimmedIdsRef.current = dimmedIds; }, [dimmedIds]);
+  useEffect(() => { highlightedIdsRef.current = highlightedIds; }, [highlightedIds]);
+  useEffect(() => { activeProjectRef.current = activeProject; }, [activeProject]);
+  useEffect(() => { clustersRef.current = clusters ?? []; }, [clusters]);
+  useEffect(() => { showClustersRef.current = showClusters; }, [showClusters]);
+
+  // Rebuild nodeById when data changes
+  useEffect(() => {
+    const map = new Map<number, FGNode>();
+    for (const n of data.nodes) map.set(n.id, n as FGNode);
+    nodesByIdRef.current = map;
+  }, [data]);
+
+  // Attach clusterId to node objects + update cluster force
+  useEffect(() => {
+    const clusterMap = new Map<number, string>();
+    if (showClusters && clusters?.length) {
+      for (const cl of clusters) {
+        for (const nid of cl.node_ids) clusterMap.set(nid, cl.id);
+      }
+    }
+    for (const n of data.nodes) {
+      (n as FGNode).clusterId = clusterMap.get(n.id);
+    }
+    fgRef.current?.d3Force("cluster", buildClusterForce(clusters ?? [], showClusters));
+  }, [clusters, showClusters, data.nodes]);
+
+  // Configure D3 forces after simulation initialises (useEffect runs after paint)
+  useEffect(() => {
+    const fg = fgRef.current;
+    if (!fg) return;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const charge = fg.d3Force("charge") as any;
+    charge?.strength(-80);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const link = fg.d3Force("link") as any;
+    link?.distance(50).strength((l: { type?: string }) => {
+      if (l.type === "context_of") return 0.04;
+      if (l.type === "project_scope") return 0.25;
+      return 0.6;
+    });
+
+    fg.d3Force(
+      "collision",
+      forceCollide<FGNode>().radius(n => nodeRadius(n.importance, "is_project" in n, "is_context" in n) + 2)
+    );
+    fg.d3Force("cluster", buildClusterForce(clusters ?? [], showClusters));
+
+    // Center force — keeps the graph in the viewport
+    const canvas = (fg as unknown as { canvas?: HTMLCanvasElement }).canvas;
+    const w = canvas?.width ?? 800;
+    const h = canvas?.height ?? 600;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    fg.d3Force("center", forceCenter(w / 2, h / 2).strength(0.08) as any);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
+
+  // Mount/unmount tooltip div
+  useEffect(() => {
+    const tip = document.createElement("div");
+    tip.style.cssText = [
+      "position:fixed", "visibility:hidden", "pointer-events:none",
+      "z-index:9999", "max-width:280px", "border-radius:8px",
+      "padding:8px 10px", "font-size:11px", "line-height:1.5",
+    ].join(";");
+    document.body.appendChild(tip);
+    tooltipRef.current = tip;
+    return () => { tip.remove(); tooltipRef.current = null; };
+  }, []);
+
+  // ── Imperative handle ──────────────────────────────────────────────────────
   useImperativeHandle(ref, () => ({
-    zoomToNode(id: number) {
-      const node = simNodesRef.current.find(n => n.id === id);
-      const svgEl = svgRef.current;
-      if (!node || !zoomRef.current || !svgEl) return;
-      const W = svgEl.clientWidth || 900;
-      const H = svgEl.clientHeight || 600;
-      d3.select(svgEl).transition().duration(600).call(
-        zoomRef.current.transform,
-        d3.zoomIdentity.translate(W / 2 - (node.x ?? 0), H / 2 - (node.y ?? 0)).scale(1.5)
-      );
+    zoomToNode(id: number): void {
+      const node = nodesByIdRef.current.get(id);
+      if (node?.x != null && node?.y != null) {
+        fgRef.current?.centerAt(node.x, node.y, 600);
+        fgRef.current?.zoom(1.5, 600);
+      }
     },
-    fitToScreen() {
-      fitBoundsRef.current?.();
+    fitToScreen(): void {
+      fgRef.current?.zoomToFit(400, 40);
     },
-    resetSimulation() {
-      simRef.current?.alpha(1).restart();
+    resetSimulation(): void {
+      fgRef.current?.d3ReheatSimulation();
     },
   }), []);
 
-  // Main effect: build simulation. Reruns when data or theme changes.
-  useEffect(() => {
-    const isDark = resolvedTheme !== "light";
-    const graphColors = {
-      memory: isDark ? "#1e4a7a" : "#dbeafe",
-      memoryStroke: isDark ? "#58a6ff" : "#1d4ed8",
-      project: isDark ? "#1a4731" : "#dcfce7",
-      projectStroke: isDark ? "#3fb950" : "#16a34a",
-      linkStroke: isDark ? "#30363d" : "#d0d7de",
-      labelFill: isDark ? "#e6edf3" : "#1f2328",
-      labelFillMuted: isDark ? "#6b7280" : "#656d76",
-    };
+  // ── Canvas callbacks (stable — read from refs) ─────────────────────────────
 
-    const svgEl = svgRef.current;
-    if (!svgEl) return;
-    const svg = d3.select(svgEl);
-    svg.selectAll("*").remove();
+  const paintNode = useCallback((nodeObj: NodeObject, ctx: CanvasRenderingContext2D, globalScale: number): void => {
+    const node = nodeObj as FGNode;
+    const colors = colorsRef.current;
+    const isProject = "is_project" in node;
+    const isContext = "is_context" in node;
+    const r = nodeRadius(node.importance ?? 1, isProject, isContext);
+    const x = node.x ?? 0;
+    const y = node.y ?? 0;
+    const color = nodeColor(node.category);
+    const dimmed = dimmedIdsRef.current?.has(node.id) ?? false;
+    const highlighted = highlightedIdsRef.current?.has(node.id) ?? false;
+    const inActiveProject = !!activeProjectRef.current && (node as GraphNode).project_scope === activeProjectRef.current;
 
-    // Create tooltip div once, reuse across data changes
-    if (!tooltipRef.current) {
-      const tip = document.createElement("div");
-      tip.style.cssText = [
-        "position:fixed", "visibility:hidden", "pointer-events:none",
-        "z-index:9999", "max-width:280px",
-        "border-radius:8px", "padding:8px 10px",
-        "font-size:11px", "line-height:1.5",
-      ].join(";");
-      document.body.appendChild(tip);
-      tooltipRef.current = tip;
+    ctx.save();
+    ctx.globalAlpha = dimmed ? 0.15 : 1;
+
+    // Glow
+    if (isProject || highlighted) {
+      ctx.shadowBlur = highlighted ? 10 : 6;
+      ctx.shadowColor = highlighted ? "#60a5fa" : color;
     }
-    const tip = tooltipRef.current;
-    // Update tooltip theme on each effect run (theme may have changed)
-    tip.style.background = isDark ? "#1c2333" : "#ffffff";
-    tip.style.border = `1px solid ${isDark ? "#374151" : "#d0d7de"}`;
-    tip.style.boxShadow = isDark ? "0 4px 12px rgba(0,0,0,0.5)" : "0 4px 12px rgba(0,0,0,0.15)";
 
-    const width = svgEl.clientWidth || 900;
-    const height = svgEl.clientHeight || 600;
-    const g = svg.append("g");
+    // Circle
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, 2 * Math.PI);
+    ctx.fillStyle = color;
+    ctx.globalAlpha = dimmed ? 0.15 : isProject ? 1 : 0.85;
+    ctx.fill();
 
-    // Cache selection for zoom handler — avoids DOM query on every zoom tick
-    let memoryLabels: d3.Selection<SVGTextElement, RawNode, SVGGElement, unknown> | null = null;
+    // Stroke
+    if (isProject || highlighted || inActiveProject) {
+      ctx.strokeStyle = highlighted ? "#60a5fa" : inActiveProject ? "#ffffff" : color;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
 
-    const zoom = d3.zoom<SVGSVGElement, unknown>()
-      .scaleExtent([0.1, 4])
-      .on("zoom", (event) => {
-        g.attr("transform", event.transform.toString());
-        if (memoryLabels) {
-          memoryLabels.attr("opacity", Math.max(0, (event.transform.k - 0.8) / 0.4));
-        }
-      });
-    zoomRef.current = zoom;
-    svg.call(zoom);
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = dimmed ? 0.15 : 1;
 
-    const defs = svg.append("defs");
-    // Glow filter for project nodes
-    const filter = defs.append("filter").attr("id", "glow").attr("x", "-50%").attr("y", "-50%").attr("width", "200%").attr("height", "200%");
-    filter.append("feGaussianBlur").attr("in", "SourceGraphic").attr("stdDeviation", "3").attr("result", "blur");
-    const feMerge = filter.append("feMerge");
-    feMerge.append("feMergeNode").attr("in", "blur");
-    feMerge.append("feMergeNode").attr("in", "SourceGraphic");
-
-    // Search highlight glow filter (stronger blue)
-    const searchFilter = defs.append("filter").attr("id", "glow-search").attr("x", "-60%").attr("y", "-60%").attr("width", "220%").attr("height", "220%");
-    searchFilter.append("feGaussianBlur").attr("in", "SourceGraphic").attr("stdDeviation", "5").attr("result", "blur");
-    const sfeMerge = searchFilter.append("feMerge");
-    sfeMerge.append("feMergeNode").attr("in", "blur");
-    sfeMerge.append("feMergeNode").attr("in", "SourceGraphic");
-
-    // Build clusterId lookup from clusters prop
-    const nodeClusterMap = new Map<number, string>();
-    if (clusters && showClusters) {
-      for (const cl of clusters) {
-        for (const nid of cl.node_ids) nodeClusterMap.set(nid, cl.id);
+    // Labels
+    ctx.textAlign = "center";
+    if (isProject) {
+      ctx.font = "600 8px sans-serif";
+      ctx.fillStyle = color;
+      ctx.fillText(node.label.length > 14 ? node.label.substring(0, 13) + "…" : node.label, x, y + r + 9);
+    } else if (!isContext) {
+      const important = (node.importance ?? 1) >= 4;
+      if (important) {
+        ctx.font = "7px sans-serif";
+        ctx.fillStyle = colors.labelFill;
+        ctx.fillText(node.label.length > 18 ? node.label.substring(0, 17) + "…" : node.label, x, y + r + 7);
+      } else if (globalScale > 1.2) {
+        const labelAlpha = Math.min(1, (globalScale - 0.8) / 0.4);
+        ctx.globalAlpha = dimmed ? 0.15 * labelAlpha : labelAlpha;
+        ctx.font = "6px sans-serif";
+        ctx.fillStyle = colors.labelFillMuted;
+        ctx.fillText(node.label.length > 16 ? node.label.substring(0, 15) + "…" : node.label, x, y + r + 7);
       }
     }
 
-    const rawNodes: RawNode[] = data.nodes.map(n => ({
-      id: n.id,
-      label: n.label,
-      content: n.content,
-      category: n.category,
-      importance: n.importance,
-      project_scope: n.project_scope,
-      is_project: "is_project" in n ? true : undefined,
-      is_context: "is_context" in n ? true : undefined,
-      clusterId: nodeClusterMap.get(n.id),
-      _original: n,
-    }));
-    simNodesRef.current = rawNodes;
-
-    const nodeById = new Map(rawNodes.map(n => [n.id, n]));
-
-    const rawLinks: RawLink[] = data.links.flatMap(l => {
-      const src = nodeById.get(typeof l.source === "number" ? l.source : (l.source as GraphNode).id);
-      const tgt = nodeById.get(typeof l.target === "number" ? l.target : (l.target as GraphNode).id);
-      return src && tgt ? [{ source: src, target: tgt, type: l.type }] : [];
-    });
-
-    const linkForce = d3.forceLink<RawNode, RawLink>(rawLinks).id(d => d.id)
-      .distance(50)
-      .strength(d => {
-        if (d.type === "context_of") return 0.04;    // context items float loosely
-        if (d.type === "project_scope") return 0.25; // project members: moderate pull
-        return 0.6;                                   // memory relations: strong
-      });
-
-    // Cluster centroid force: pull nodes toward their cluster's centroid
-    const clusterCentroidForce = () => {
-      if (!clusters || !showClusters) return;
-      const centroids = new Map<string, { x: number; y: number; count: number }>();
-      for (const n of rawNodes) {
-        if (!n.clusterId) continue;
-        const c = centroids.get(n.clusterId) ?? { x: 0, y: 0, count: 0 };
-        centroids.set(n.clusterId, { x: c.x + (n.x ?? 0), y: c.y + (n.y ?? 0), count: c.count + 1 });
-      }
-      for (const n of rawNodes) {
-        if (!n.clusterId) continue;
-        const c = centroids.get(n.clusterId);
-        if (!c || c.count < 2) continue;
-        const cx = c.x / c.count;
-        const cy = c.y / c.count;
-        const strength = 0.12;
-        n.vx = (n.vx ?? 0) + (cx - (n.x ?? 0)) * strength;
-        n.vy = (n.vy ?? 0) + (cy - (n.y ?? 0)) * strength;
-      }
-    };
-
-    const simulation = d3.forceSimulation<RawNode>(rawNodes)
-      .force("link", linkForce)
-      .force("charge", d3.forceManyBody<RawNode>().strength(-80))
-      .force("center", d3.forceCenter(width / 2, height / 2).strength(0.08))
-      .force("collision", d3.forceCollide<RawNode>().radius(d => nodeRadius(d.importance, d.is_project, d.is_context) + 2))
-      .force("cluster", clusterCentroidForce as d3.Force<RawNode, RawLink>)
-      .alphaDecay(0.025);
-    simRef.current = simulation;
-
-    // Cluster hull group — rendered before links so hulls appear behind everything
-    const hullGroup = g.append("g").attr("class", "cluster-hulls");
-    const clusterMap = new Map<string, Cluster>();
-    if (clusters && showClusters) {
-      for (const cl of clusters) clusterMap.set(cl.id, cl);
-    }
-
-    const link = g.selectAll<SVGLineElement, RawLink>("line")
-      .data(rawLinks)
-      .join("line")
-      .attr("stroke", graphColors.linkStroke)
-      .attr("stroke-width", d => d.type === "project_scope" ? 1 : 0.8)
-      .attr("stroke-opacity", 0.7)
-      .attr("stroke-dasharray", d => d.type === "context_of" ? "2,2" : null);
-
-    const node = g.selectAll<SVGGElement, RawNode>("g.node")
-      .data(rawNodes)
-      .join("g")
-      .attr("class", "node")
-      .style("cursor", "pointer")
-      .on("click", (_event, d) => {
-        if (d.is_project) {
-          router.push(`/project/${encodeURIComponent(d.label)}`);
-        } else {
-          onNodeClick(d._original);
-        }
-      })
-      .on("mouseenter", (event: MouseEvent, d: RawNode) => {
-        populateTooltip(tip, d, isDark);
-        tip.style.visibility = "visible";
-        tip.style.left = `${event.clientX + 14}px`;
-        tip.style.top = `${event.clientY - 10}px`;
-      })
-      .on("mousemove", (event: MouseEvent) => {
-        tip.style.left = `${event.clientX + 14}px`;
-        tip.style.top = `${event.clientY - 10}px`;
-      })
-      .on("mouseleave", () => { tip.style.visibility = "hidden"; })
-      .call(
-        d3.drag<SVGGElement, RawNode>()
-          .on("start", (event, d) => {
-            if (!event.active) simulation.alphaTarget(0.3).restart();
-            d.fx = d.x; d.fy = d.y;
-          })
-          .on("drag", (event, d) => { d.fx = event.x; d.fy = event.y; })
-          .on("end", (event, d) => {
-            if (!event.active) simulation.alphaTarget(0);
-            d.fx = null; d.fy = null;
-          })
-      );
-
-    node.append("circle")
-      .attr("class", "node-circle")
-      .attr("r", d => nodeRadius(d.importance, d.is_project, d.is_context))
-      .attr("fill", d => nodeColor(d.category))
-      .attr("fill-opacity", d => d.is_project ? 1 : 0.85)
-      .attr("stroke", d => d.is_project ? nodeColor(d.category) : "transparent")
-      .attr("stroke-width", d => d.is_project ? 1.5 : 0)
-      .attr("filter", d => d.is_project ? "url(#glow)" : null);
-
-    // Project labels — always visible
-    node.filter(d => !!d.is_project)
-      .append("text")
-      .attr("class", "node-label-project")
-      .attr("dy", d => nodeRadius(d.importance, d.is_project, d.is_context) + 9)
-      .attr("text-anchor", "middle")
-      .attr("font-size", 8)
-      .attr("fill", d => nodeColor(d.category))
-      .attr("font-weight", "600")
-      .attr("pointer-events", "none")
-      .text(d => d.label.length > 14 ? d.label.substring(0, 13) + "…" : d.label);
-
-    // Important node labels (importance >= 4) — always visible at all zoom levels
-    node.filter(d => !d.is_project && d.importance >= 4)
-      .append("text")
-      .attr("class", "node-label-important")
-      .attr("dy", d => nodeRadius(d.importance, d.is_project, d.is_context) + 7)
-      .attr("text-anchor", "middle")
-      .attr("font-size", 7)
-      .attr("fill", graphColors.labelFill)
-      .attr("pointer-events", "none")
-      .text(d => d.label.length > 18 ? d.label.substring(0, 17) + "…" : d.label);
-
-    // Memory labels (importance < 4) — only visible when zoomed in
-    node.filter(d => !d.is_project && d.importance < 4)
-      .append("text")
-      .attr("class", "node-label-memory")
-      .attr("dy", d => nodeRadius(d.importance, d.is_project, d.is_context) + 7)
-      .attr("text-anchor", "middle")
-      .attr("font-size", 6)
-      .attr("fill", graphColors.labelFillMuted)
-      .attr("pointer-events", "none")
-      .text(d => d.label.length > 16 ? d.label.substring(0, 15) + "…" : d.label);
-
-    // Populate cached selection — only zoom-faded labels (not important ones)
-    memoryLabels = g.selectAll<SVGTextElement, RawNode>(".node-label-memory");
-
-    const fitBounds = () => {
-      const nodes = simNodesRef.current;
-      if (nodes.length === 0) return;
-      const bounds = nodes.reduce(
-        (acc, n) => ({
-          minX: Math.min(acc.minX, n.x ?? 0), maxX: Math.max(acc.maxX, n.x ?? 0),
-          minY: Math.min(acc.minY, n.y ?? 0), maxY: Math.max(acc.maxY, n.y ?? 0),
-        }),
-        { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity }
-      );
-      const x0 = bounds.minX - 40, x1 = bounds.maxX + 40;
-      const y0 = bounds.minY - 40, y1 = bounds.maxY + 40;
-      const scale = Math.min(width / (x1 - x0), height / (y1 - y0), 1);
-      const tx = (width - scale * (x0 + x1)) / 2;
-      const ty = (height - scale * (y0 + y1)) / 2;
-      d3.select(svgEl).call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(scale));
-    };
-    fitBoundsRef.current = fitBounds;
-    simulation.on("end", fitBounds);
-
-    simulation.on("tick", () => {
-      link
-        .attr("x1", d => d.source.x ?? 0)
-        .attr("y1", d => d.source.y ?? 0)
-        .attr("x2", d => d.target.x ?? 0)
-        .attr("y2", d => d.target.y ?? 0);
-      node.attr("transform", d => `translate(${d.x ?? 0},${d.y ?? 0})`);
-
-      // Recompute hull paths grouped by clusterId
-      if (clusters && showClusters && clusters.length > 0) {
-        type HullDatum = { id: string; pts: [number, number][]; cluster: Cluster };
-        const pointsByCluster = new Map<string, [number, number][]>();
-        for (const n of rawNodes) {
-          if (!n.clusterId) continue;
-          const pts = pointsByCluster.get(n.clusterId) ?? [];
-          pts.push([n.x ?? 0, n.y ?? 0]);
-          pointsByCluster.set(n.clusterId, pts);
-        }
-
-        const hullData = [...pointsByCluster.entries()]
-          .map(([id, pts]) => ({ id, pts, cluster: clusterMap.get(id) }))
-          .filter((h): h is HullDatum => h.cluster != null);
-
-        hullGroup
-          .selectAll<SVGPathElement, HullDatum>("path.cluster-hull")
-          .data(hullData, d => d.id)
-          .join(
-            enter => enter.append("path")
-              .attr("class", "cluster-hull")
-              .attr("fill-opacity", 0.08)
-              .attr("stroke-opacity", 0.4)
-              .attr("stroke-width", 1.5)
-              .attr("stroke-dasharray", "4,3")
-              .style("cursor", "pointer")
-              // Event listeners attached once on enter, not re-bound every tick
-              .on("mouseenter", function(event: MouseEvent, d) {
-                d3.select(this).attr("fill-opacity", 0.15);
-                tip.style.visibility = "visible";
-                tip.style.left = `${event.clientX + 14}px`;
-                tip.style.top = `${event.clientY - 10}px`;
-                while (tip.firstChild) tip.removeChild(tip.firstChild);
-                const label = document.createElement("div");
-                label.style.cssText = `color:${isDark ? "#e5e7eb" : "#1f2328"};font-weight:600`;
-                label.textContent = d.cluster.label;
-                tip.appendChild(label);
-                const count = document.createElement("div");
-                count.style.cssText = `color:${isDark ? "#9ca3af" : "#656d76"};font-size:10px`;
-                count.textContent = `${d.pts.length} nodes`;
-                tip.appendChild(count);
-              })
-              .on("mousemove", (event: MouseEvent) => {
-                tip.style.left = `${event.clientX + 14}px`;
-                tip.style.top = `${event.clientY - 10}px`;
-              })
-              .on("mouseleave", function() {
-                d3.select(this).attr("fill-opacity", 0.08);
-                tip.style.visibility = "hidden";
-              })
-              .on("click", (_event, d) => { onClusterClick?.(d.id); }),
-            update => update
-          )
-          // Update dynamic attrs on every tick (enter + update)
-          .attr("d", d => hullPath(d.pts))
-          .attr("fill", d => d.cluster.color)
-          .attr("stroke", d => d.cluster.color);
-      }
-    });
-
-    return () => {
-      simulation.stop();
-      tip.style.visibility = "hidden";
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, resolvedTheme, clusters, showClusters]);
-
-  // Cleanup tooltip div on unmount
-  useEffect(() => {
-    return () => {
-      if (tooltipRef.current) {
-        tooltipRef.current.remove();
-        tooltipRef.current = null;
-      }
-    };
+    ctx.restore();
   }, []);
 
-  // Highlight activeProject without rebuilding simulation
-  useEffect(() => {
-    const svgEl = svgRef.current;
-    if (!svgEl) return;
-    d3.select(svgEl).selectAll<SVGCircleElement, RawNode>("circle.node-circle")
-      .attr("stroke", d => activeProject && d.project_scope === activeProject ? "#ffffff" : "#1f2937")
-      .attr("stroke-width", d => activeProject && d.project_scope === activeProject ? 2.5 : 1);
-  }, [activeProject]);
+  const paintLink = useCallback((linkObj: unknown, ctx: CanvasRenderingContext2D): void => {
+    const link = linkObj as { source: FGNode; target: FGNode; type?: string };
+    const sx = link.source?.x ?? 0, sy = link.source?.y ?? 0;
+    const tx = link.target?.x ?? 0, ty = link.target?.y ?? 0;
+    const colors = colorsRef.current;
 
-  // Dim nodes not matching active tag filter
-  useEffect(() => {
-    const svgEl = svgRef.current;
-    if (!svgEl) return;
-    d3.select(svgEl).selectAll<SVGGElement, RawNode>("g.node")
-      .attr("opacity", d => dimmedIds?.size && dimmedIds.has(d.id) ? 0.15 : 1);
-  }, [dimmedIds]);
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(tx, ty);
+    ctx.strokeStyle = colors.linkStroke;
+    ctx.lineWidth = link.type === "project_scope" ? 1 : 0.8;
+    ctx.globalAlpha = 0.7;
+    if (link.type === "context_of") ctx.setLineDash([2, 2]);
+    ctx.stroke();
+    ctx.restore();
+  }, []);
 
-  // Highlight search-matched nodes with a blue glow
-  useEffect(() => {
-    const svgEl = svgRef.current;
-    if (!svgEl) return;
-    const circles = d3.select(svgEl).selectAll<SVGCircleElement, RawNode>("circle.node-circle");
-    if (highlightedIds?.size) {
-      circles
-        .attr("stroke", d => {
-          if (highlightedIds.has(d.id)) return "#60a5fa";
-          if (activeProject && d.project_scope === activeProject) return "#ffffff";
-          return "#1f2937";
-        })
-        .attr("stroke-width", d => highlightedIds.has(d.id) || (!!activeProject && d.project_scope === activeProject) ? 2.5 : 1)
-        .attr("filter", d => d.is_project ? "url(#glow)" : (highlightedIds.has(d.id) ? "url(#glow-search)" : null));
-    } else {
-      circles
-        .attr("stroke", d => activeProject && d.project_scope === activeProject ? "#ffffff" : "#1f2937")
-        .attr("stroke-width", d => activeProject && d.project_scope === activeProject ? 2.5 : 1)
-        .attr("filter", d => d.is_project ? "url(#glow)" : null);
+  // Draw cluster hulls BEFORE nodes (so they appear behind)
+  const drawClusterHulls = useCallback((ctx: CanvasRenderingContext2D): void => {
+    if (!showClustersRef.current) return;
+    const cls = clustersRef.current;
+    if (!cls.length) return;
+    const nodesById = nodesByIdRef.current;
+
+    for (const cluster of cls) {
+      const pts: [number, number][] = [];
+      for (const nid of cluster.node_ids) {
+        const n = nodesById.get(nid);
+        if (n?.x != null && n?.y != null) pts.push([n.x, n.y]);
+      }
+      if (!pts.length) continue;
+      const hull = hullPoints(pts, 18);
+      if (!hull || hull.length < 2) continue;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(hull[0][0], hull[0][1]);
+      for (let i = 1; i < hull.length; i++) ctx.lineTo(hull[i][0], hull[i][1]);
+      ctx.closePath();
+      ctx.fillStyle = cluster.color + "15";
+      ctx.strokeStyle = cluster.color + "60";
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 3]);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
     }
-  }, [highlightedIds, activeProject]);
+  }, []);
 
-  return <svg ref={svgRef} className="w-full h-full bg-[var(--bg-primary)]" />;
+  const handleNodeClick = useCallback((nodeObj: NodeObject): void => {
+    const node = nodeObj as FGNode;
+    if ("is_project" in node) {
+      router.push(`/project/${encodeURIComponent(node.label)}`);
+    } else {
+      onNodeClickRef.current(node as GraphNode);
+    }
+  }, [router]);
+
+  const handleNodeHover = useCallback((nodeObj: NodeObject | null): void => {
+    hoveredRef.current = nodeObj as FGNode | null;
+    const tip = tooltipRef.current;
+    if (!tip) return;
+    if (nodeObj) {
+      const node = nodeObj as FGNode;
+      const { isDark } = colorsRef.current;
+      populateTooltip(tip, node, isDark);
+      tip.style.background = isDark ? "#1c2333" : "#ffffff";
+      tip.style.border = `1px solid ${isDark ? "#374151" : "#d0d7de"}`;
+      tip.style.boxShadow = isDark ? "0 4px 12px rgba(0,0,0,0.5)" : "0 4px 12px rgba(0,0,0,0.15)";
+      tip.style.left = `${mouseRef.current.x + 14}px`;
+      tip.style.top = `${mouseRef.current.y - 10}px`;
+      tip.style.visibility = "visible";
+    } else {
+      tip.style.visibility = "hidden";
+    }
+  }, []);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent): void => {
+    mouseRef.current = { x: e.clientX, y: e.clientY };
+    if (hoveredRef.current && tooltipRef.current) {
+      tooltipRef.current.style.left = `${e.clientX + 14}px`;
+      tooltipRef.current.style.top = `${e.clientY - 10}px`;
+    }
+  }, []);
+
+  return (
+    <GraphErrorBoundary>
+      <div
+        className="w-full h-full"
+        onMouseMove={handleMouseMove}
+        role="img"
+        aria-label="LTM memory graph"
+      >
+        <ForceGraph2D
+          ref={fgRef as MutableRefObject<ForceGraphMethods<FGNode> | undefined>}
+          graphData={data as unknown as { nodes: FGNode[]; links: object[] }}
+          backgroundColor={colorsRef.current.bg}
+          nodeCanvasObject={paintNode}
+          nodeCanvasObjectMode={() => "replace"}
+          linkCanvasObject={paintLink}
+          linkCanvasObjectMode={() => "replace"}
+          onNodeClick={handleNodeClick}
+          onNodeHover={handleNodeHover}
+          onRenderFramePre={drawClusterHulls}
+          d3AlphaDecay={0.025}
+          cooldownTicks={300}
+          autoPauseRedraw={false}
+        />
+      </div>
+    </GraphErrorBoundary>
+  );
 });
 
 export default Graph;

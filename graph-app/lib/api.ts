@@ -2,6 +2,7 @@ import type {
   ClaudeConfig,
   ClaudeLtmConfig,
   Cluster,
+  ConfigExplorerData,
   CtxItem,
   GraphData,
   HealthData,
@@ -140,4 +141,7 @@ export const api = {
     post("/clusters/merge", { sourceId, targetId }),
   splitCluster: (id: string, nodeIds1: number[], nodeIds2: number[]): Promise<{ ok: boolean }> =>
     post(`/clusters/${encodeURIComponent(id)}/split`, { nodeIds1, nodeIds2 }),
+
+  // Config Explorer
+  configExplorer: (): Promise<ConfigExplorerData> => get("/config-explorer"),
 };

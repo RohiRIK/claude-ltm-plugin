@@ -241,6 +241,42 @@ export interface Cluster {
   updated_at: string;
 }
 
+// Config Explorer
+export interface SkillEntry {
+  name: string;
+  description: string;
+  slashCommand?: string;
+  triggerPhrases: string[];
+  workflows: string[];
+  path: string;
+}
+
+export interface AgentEntry {
+  name: string;
+  description: string;
+  whenToUse: string;
+  path: string;
+}
+
+export interface HookEntry {
+  event: string;
+  matcher?: string;
+  description: string;
+}
+
+export interface RuleEntry {
+  name: string;
+  summary: string;
+  path: string;
+}
+
+export interface ConfigExplorerData {
+  skills: SkillEntry[];
+  agents: AgentEntry[];
+  hooks: HookEntry[];
+  rules: RuleEntry[];
+}
+
 // Phase 4: Project Health Score
 
 export type ProjectHealthStatus = "healthy" | "needs_attention" | "neglected";
