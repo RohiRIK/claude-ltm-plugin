@@ -35,6 +35,26 @@ function strip(obj: any): any {
   return obj;
 }
 
+/** Compact formatter — strips verbose fields and truncates content to keep MCP responses small. */
+function compact(memories: any[]): any[] {
+  const MAX_CONTENT = 300;
+  return memories.map(m => ({
+    id: m.id,
+    content: m.content?.length > MAX_CONTENT ? m.content.slice(0, MAX_CONTENT) + "…" : m.content,
+    category: m.category,
+    importance: m.importance,
+    tags: m.tags,
+    project_scope: m.project_scope,
+    ...(m.relations?.length > 0 && {
+      relations: m.relations.map((r: any) => ({
+        id: r.memory?.id,
+        type: r.relationship_type,
+        dir: r.direction,
+      })),
+    }),
+  }));
+}
+
 // ─── Server ──────────────────────────────────────────────────────────────────
 
 const server = new McpServer(
@@ -52,10 +72,12 @@ server.tool(
     project: z.string().optional().describe("Filter by project scope"),
     limit: z.number().int().min(1).max(50).optional().describe("Max results (default 10)"),
     category: z.enum(["preference", "architecture", "gotcha", "pattern", "workflow", "constraint"]).optional(),
+    verbose: z.boolean().optional().describe("Return full memory objects (default false — returns compact format to save context)"),
   },
-  async ({ query, project, limit, category }) => {
+  async ({ query, project, limit, category, verbose }) => {
     const results = await recall({ query, project, limit, category });
-    return { content: [{ type: "text", text: JSON.stringify(strip(results), null, 2) }] };
+    const payload = verbose ? strip(results) : compact(strip(results));
+    return { content: [{ type: "text", text: JSON.stringify(payload) }] };
   },
 );
 
@@ -124,7 +146,7 @@ server.tool(
   },
   async ({ project }) => {
     const result = getContextMerge(project);
-    return { content: [{ type: "text", text: JSON.stringify(strip(result), null, 2) }] };
+    return { content: [{ type: "text", text: JSON.stringify(strip(result)) }] };
   },
 );
 
@@ -173,7 +195,7 @@ server.tool(
   },
   async ({ project, type }) => {
     const items = getItems(project, type);
-    return { content: [{ type: "text", text: JSON.stringify(items, null, 2) }] };
+    return { content: [{ type: "text", text: JSON.stringify(items) }] };
   },
 );
 
@@ -188,7 +210,7 @@ server.resource(
     const rows = db.query<Memory, []>(
       `SELECT * FROM memories WHERE importance = 5 AND project_scope IS NULL AND status = 'active' ORDER BY created_at DESC`,
     ).all();
-    return { contents: [{ uri: "memory://globals", text: JSON.stringify(strip(rows), null, 2), mimeType: "application/json" }] };
+    return { contents: [{ uri: "memory://globals", text: JSON.stringify(strip(rows)), mimeType: "application/json" }] };
   },
 );
 
@@ -201,7 +223,7 @@ server.resource(
     const rows = db.query<Memory, []>(
       `SELECT * FROM memories WHERE status = 'active' ORDER BY created_at DESC LIMIT 20`,
     ).all();
-    return { contents: [{ uri: "memory://recent", text: JSON.stringify(strip(rows), null, 2), mimeType: "application/json" }] };
+    return { contents: [{ uri: "memory://recent", text: JSON.stringify(strip(rows)), mimeType: "application/json" }] };
   },
 );
 
@@ -216,7 +238,7 @@ server.resource(
        JOIN memory_tags mt ON t.id = mt.tag_id
        GROUP BY t.id ORDER BY count DESC`,
     ).all();
-    return { contents: [{ uri: "memory://tags", text: JSON.stringify(strip(rows), null, 2), mimeType: "application/json" }] };
+    return { contents: [{ uri: "memory://tags", text: JSON.stringify(strip(rows)), mimeType: "application/json" }] };
   },
 );
 

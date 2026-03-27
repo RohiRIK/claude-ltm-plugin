@@ -1,5 +1,43 @@
 # Changelog
 
+## [1.3.8] — 2026-03-27
+
+### Fixed
+- **Compact MCP responses** — `ltm_recall` now returns a compact format by default, reducing response size by ~70-80%. Strips verbose metadata fields, truncates content to 300 chars, and slims relations to `{id, type, dir}`. Pass `verbose: true` to get the full output.
+- **Removed JSON pretty-printing** across all MCP tools and resources (`ltm_recall`, `ltm_context`, `ltm_context_items`, globals/recent/tags resources). Compact JSON halves whitespace overhead.
+
+---
+
+## [1.3.7] — 2026-03-26
+
+### Added
+- **Graph UI improvements** — nav active state, config polish, force-directed graph tuning, health auto-refresh.
+- **Config Explorer page** in graph-app — browse LTM configuration visually.
+- **`src/janitor/`** module for memory maintenance tasks.
+
+### Changed
+- **Graph visualization** migrated from custom D3 to `react-force-graph-2d`.
+- **Config Explorer API** added to graph-server (`/api/config-explorer`).
+- Removed old HTML route from graph-server.
+- LtmServer skill updated to use `CLAUDE_PLUGIN_ROOT` instead of hardcoded `~/.claude/memory/`.
+
+---
+
+## [1.3.0–1.3.6] — 2026-03-25
+
+### Added
+- **`/migrate-db` command** — check and migrate `ltm.db` from legacy `~/.claude/memory/` to marketplace plugin data directory.
+- **Auto git-fetch** on SessionStart — marketplace clone stays current without manual pulls.
+- **Self-healing GitHub source** — `install-wiring.ts` patches `known_marketplaces.json` to `"source":"github"` on every postinstall, preventing the plugin system from reverting to `"git"` source.
+
+### Fixed
+- DB path migration fix — ensures `ltm.db` is always found at the correct marketplace data path.
+- Duplicate MCP registration removed from `install-wiring.ts`.
+- `patchMarketplaceSource` refactored — no mutation, no TOCTOU race, uses named constant.
+- Version sync — both `package.json` and `.claude-plugin/plugin.json` are kept in lockstep.
+
+---
+
 ## [1.2.0] — 2026-03-24
 
 ### Added

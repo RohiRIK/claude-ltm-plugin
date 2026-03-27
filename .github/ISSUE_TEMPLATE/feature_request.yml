@@ -1,0 +1,44 @@
+name: Feature Request
+description: Suggest an idea or improvement
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ideas welcome! Describe what you'd like and why.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What would you like?
+      description: Clear description of the feature
+      placeholder: "It would be great if ltm_recall could..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use case
+      description: When would you use this?
+      placeholder: "When I'm working on a large project and need to..."
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Which component?
+      options:
+        - MCP Server (recall, learn, etc.)
+        - Hooks (SessionStart, EvaluateSession, etc.)
+        - Commands (/ltm:recall, /ltm:learn, etc.)
+        - Graph Visualizer
+        - Configuration
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any workarounds you've tried?
