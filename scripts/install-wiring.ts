@@ -52,27 +52,31 @@ if (existsSync(claudeJson)) {
 // ── Hooks wiring ─────────────────────────────────────────────────────────────
 type HookEntry = { matcher: string; hooks: { type: string; command: string }[] };
 
-const settings = JSON.parse(readFileSync(settingsJson, "utf-8"));
-const hooks: Record<string, HookEntry[]> = settings.hooks ?? {};
-settings.hooks = hooks;
+if (!existsSync(settingsJson)) {
+  console.log("  ℹ ~/.claude/settings.json not found — skipping hooks wiring");
+} else {
+  const settings = JSON.parse(readFileSync(settingsJson, "utf-8"));
+  const hooks: Record<string, HookEntry[]> = settings.hooks ?? {};
+  settings.hooks = hooks;
 
-const LTM_HOOKS: [string, string][] = [
-  ["SessionStart", `CLAUDE_PLUGIN_ROOT=${root} bun run ${root}/hooks/src/SessionStart.ts`],
-  ["Stop",         `CLAUDE_PLUGIN_ROOT=${root} bun run ${root}/hooks/src/UpdateContext.ts`],
-  ["Stop",         `CLAUDE_PLUGIN_ROOT=${root} bun run ${root}/hooks/src/EvaluateSession.ts`],
-  ["PreCompact",   `CLAUDE_PLUGIN_ROOT=${root} bun run ${root}/hooks/src/PreCompact.ts`],
-];
+  const LTM_HOOKS: [string, string][] = [
+    ["SessionStart", `CLAUDE_PLUGIN_ROOT=${root} bun run ${root}/hooks/src/SessionStart.ts`],
+    ["Stop",         `CLAUDE_PLUGIN_ROOT=${root} bun run ${root}/hooks/src/UpdateContext.ts`],
+    ["Stop",         `CLAUDE_PLUGIN_ROOT=${root} bun run ${root}/hooks/src/EvaluateSession.ts`],
+    ["PreCompact",   `CLAUDE_PLUGIN_ROOT=${root} bun run ${root}/hooks/src/PreCompact.ts`],
+  ];
 
-for (const [event, command] of LTM_HOOKS) {
-  hooks[event] ??= [];
-  const already = hooks[event]!.some(e => e.hooks.some(h => h.command.includes(command)));
-  if (!already) {
-    hooks[event]!.push({ matcher: "", hooks: [{ type: "command", command }] });
+  for (const [event, command] of LTM_HOOKS) {
+    hooks[event] ??= [];
+    const already = hooks[event]!.some(e => e.hooks.some(h => h.command.includes(command)));
+    if (!already) {
+      hooks[event]!.push({ matcher: "", hooks: [{ type: "command", command }] });
+    }
   }
-}
 
-writeFileSync(settingsJson, JSON.stringify(settings, null, 2));
-console.log("  ✔ Hooks wired into ~/.claude/settings.json");
+  writeFileSync(settingsJson, JSON.stringify(settings, null, 2));
+  console.log("  ✔ Hooks wired into ~/.claude/settings.json");
+}
 
 // ── Global git post-commit hook ───────────────────────────────────────────────
 const gitHooksDir = join(CLAUDE_DIR, "hooks", "git");
