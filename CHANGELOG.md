@@ -6,6 +6,14 @@
 - **LLM migration guide** (`docs/llm-migration-guide.md`) — prompt-engineered guide that LLMs can follow to migrate users from legacy `~/.claude/memory/` setup to the plugin system. Imperative steps, shell-ready commands, decision table, verification checklist.
 - **Curl one-liner in README** — users paste a single curl command into any LLM coding session to trigger the full migration autonomously.
 
+### Fixed
+- **install-wiring.ts** — handle missing `~/.claude/settings.json` on fresh installs and CI runners.
+- **install-wiring.ts** — auto-detect marketplace installs and skip `settings.json` hook wiring (plugin system uses `hooks/hooks.json` instead). Cleans up stale LTM hooks left from previous dev installs.
+- **install-wiring.ts** — scan `~/.claude/plugins/data/ltm-*` as fallback when `CLAUDE_PLUGIN_DATA` is not set, so DB auto-copy works on first install without a session restart.
+- **CI** — use `bun run test` instead of bare `bun test` to exclude Playwright e2e tests via `--path-ignore-patterns`.
+- **bunfig.toml** — remove `preload = []` (rejected by Bun as invalid).
+- **LLM migration guide** — use `~/.claude/plugins/data/ltm-*/ltm.db` instead of `$CLAUDE_PLUGIN_DATA` (env var is only set inside plugin runtime, not in user shells).
+
 ---
 
 ## [1.3.8] — 2026-03-27
