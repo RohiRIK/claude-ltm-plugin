@@ -52,6 +52,10 @@ if (existsSync(claudeJson)) {
 // ── Hooks wiring ─────────────────────────────────────────────────────────────
 type HookEntry = { matcher: string; hooks: { type: string; command: string }[] };
 
+if (!existsSync(settingsJson)) {
+  mkdirSync(CLAUDE_DIR, { recursive: true });
+  writeFileSync(settingsJson, "{}");
+}
 const settings = JSON.parse(readFileSync(settingsJson, "utf-8"));
 const hooks: Record<string, HookEntry[]> = settings.hooks ?? {};
 settings.hooks = hooks;
