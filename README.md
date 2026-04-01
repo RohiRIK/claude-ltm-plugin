@@ -4,7 +4,7 @@
 
 **Long-Term Memory for Claude Code**
 
-[![Version](https://img.shields.io/badge/version-1.3.8-blue?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.3.9-blue?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
 [![Runtime](https://img.shields.io/badge/runtime-Bun-f472b6?style=flat-square&logo=bun)](https://bun.sh)
 [![Database](https://img.shields.io/badge/database-SQLite-003B57?style=flat-square&logo=sqlite)](https://sqlite.org)
@@ -305,7 +305,26 @@ CHANGELOG.md          Version history
 | [Commands](docs/commands.md) | Full command reference with examples |
 | [Configuration](docs/configuration.md) | All config options, DB path resolution, server settings |
 | [Migration](docs/migration.md) | Upgrading from old `~/.claude/memory/` setup |
+| [LLM Migration Guide](docs/llm-migration-guide.md) | Curl-injectable guide for LLMs to perform migration autonomously |
 | [Changelog](CHANGELOG.md) | Version history |
+
+---
+
+## Migrating from Legacy Setup
+
+If you previously used LTM via the `~/.claude/memory/` git-clone setup, [the migration guide](docs/migration.md) covers everything.
+
+### One-command LLM migration
+
+Paste this into any LLM coding session (Claude Code, Cursor, Windsurf, Copilot, etc.) and it will detect, migrate, and clean up automatically:
+
+```
+Follow these instructions exactly. Run every command. Ask before deleting files.
+
+curl -sL https://raw.githubusercontent.com/RohiRIK/claude-ltm-plugin/main/docs/llm-migration-guide.md
+```
+
+The curl fetches an [LLM-optimized migration guide](docs/llm-migration-guide.md) — imperative steps, shell-ready commands, decision table, and a verification checklist. Written for AI assistants, not humans.
 
 ---
 

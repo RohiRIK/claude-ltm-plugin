@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.9] — 2026-04-01
+
+### Added
+- **LLM migration guide** (`docs/llm-migration-guide.md`) — prompt-engineered guide that LLMs can follow to migrate users from legacy `~/.claude/memory/` setup to the plugin system. Imperative steps, shell-ready commands, decision table, verification checklist.
+- **Curl one-liner in README** — users paste a single curl command into any LLM coding session to trigger the full migration autonomously.
+
+---
+
 ## [1.3.8] — 2026-03-27
 
 ### Fixed
