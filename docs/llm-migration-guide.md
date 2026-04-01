@@ -7,8 +7,10 @@ You are migrating a user's LTM (Long-Term Memory) system from the legacy `~/.cla
 Run these three checks. Record the results as YES/NO.
 
 ```bash
-# Check A: Plugin already active?
-ls "$CLAUDE_PLUGIN_DATA/ltm.db" 2>/dev/null && echo "PLUGIN_DB=YES" || echo "PLUGIN_DB=NO"
+# Check A: Plugin DB exists?
+# Note: CLAUDE_PLUGIN_DATA is only set inside plugin hooks/MCP, not in user shells.
+# Scan the conventional plugin data directory instead.
+ls ~/.claude/plugins/data/ltm-*/ltm.db 2>/dev/null && echo "PLUGIN_DB=YES" || echo "PLUGIN_DB=NO"
 
 # Check B: Legacy DB exists?
 ls ~/.claude/memory/ltm.db 2>/dev/null && echo "LEGACY_DB=YES" || echo "LEGACY_DB=NO"
@@ -120,7 +122,7 @@ The `install-wiring.ts` script now automatically detects marketplace installs an
 After installing the plugin, verify no duplicates remain:
 
 ```bash
-grep -E 'SessionStart|UpdateContext|EvaluateSession|PreCompact' ~/.claude/settings.json
+grep -E 'SessionStart\.ts|UpdateContext\.ts|EvaluateSession\.ts|PreCompact\.ts' ~/.claude/settings.json
 ```
 
 If any LTM hook entries still appear in settings.json, they are stale — the plugin system manages hooks via `hooks/hooks.json` using `${CLAUDE_PLUGIN_ROOT}` variable substitution. Remove them manually or re-run:
@@ -151,13 +153,13 @@ Run this final checklist:
 
 ```bash
 # Plugin DB exists and has data
-ls -la "$CLAUDE_PLUGIN_DATA/ltm.db"
+ls -la ~/.claude/plugins/data/ltm-*/ltm.db
 
 # No legacy JS modules remain
 ls ~/.claude/memory/*.js 2>/dev/null && echo "WARN: legacy JS files remain" || echo "OK: clean"
 
 # No stale hooks
-grep '~/.claude/memory/' ~/.claude/settings.json && echo "WARN: stale hooks" || echo "OK: clean"
+grep -E 'SessionStart|UpdateContext|EvaluateSession|PreCompact' ~/.claude/settings.json 2>/dev/null | grep -v hooks.json && echo "WARN: stale hooks in settings.json" || echo "OK: clean"
 
 # No stale MCP entry
 grep '"ltm"' ~/.claude.json 2>/dev/null | grep 'memory' && echo "WARN: stale MCP" || echo "OK: clean"
