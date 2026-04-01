@@ -5,7 +5,7 @@
  *
  * Usage: bun run scripts/install-wiring.ts <plugin-root>
  */
-import { existsSync, readFileSync, writeFileSync, copyFileSync, mkdirSync, chmodSync } from "fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync, copyFileSync, mkdirSync, chmodSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import { execSync } from "child_process";
@@ -19,7 +19,15 @@ if (!root) {
 const CLAUDE_DIR = join(homedir(), ".claude");
 const claudeJson = join(homedir(), ".claude.json");
 
-const pluginData = process.env.CLAUDE_PLUGIN_DATA;
+// Resolve plugin data dir: env var → scan ~/.claude/plugins/data/ltm-*
+let pluginData = process.env.CLAUDE_PLUGIN_DATA;
+if (!pluginData) {
+  const dataDir = join(CLAUDE_DIR, "plugins", "data");
+  if (existsSync(dataDir)) {
+    const match = readdirSync(dataDir).find(d => d.startsWith("ltm-"));
+    if (match) pluginData = join(dataDir, match);
+  }
+}
 
 if (pluginData) {
   const targetDb  = join(pluginData, "ltm.db");

@@ -35,9 +35,20 @@ claude plugin marketplace add https://github.com/RohiRIK/claude-ltm-plugin
 claude plugin install ltm
 ```
 
-The installer automatically copies `~/.claude/memory/ltm.db` to `$CLAUDE_PLUGIN_DATA/ltm.db` if the legacy DB exists. Zero data loss.
+The installer tries to auto-copy `~/.claude/memory/ltm.db` to the plugin data directory. If `CLAUDE_PLUGIN_DATA` is not set during install (common on first install), it scans `~/.claude/plugins/data/ltm-*` as a fallback.
 
-If `CLAUDE_PLUGIN_DATA` is not set after install, restart the Claude Code session — the plugin system sets this variable.
+If the auto-copy did not run (check Step 1's PLUGIN_DB after install), copy manually:
+
+```bash
+# Find the plugin data directory
+PLUGIN_DATA=$(ls -d ~/.claude/plugins/data/ltm-* 2>/dev/null | head -1)
+
+# Copy legacy DB if plugin data dir exists but has no ltm.db
+if [ -n "$PLUGIN_DATA" ] && [ ! -f "$PLUGIN_DATA/ltm.db" ] && [ -f ~/.claude/memory/ltm.db ]; then
+  cp ~/.claude/memory/ltm.db "$PLUGIN_DATA/ltm.db"
+  echo "Copied ltm.db to $PLUGIN_DATA/"
+fi
+```
 
 ## Step 3 — Verify
 
