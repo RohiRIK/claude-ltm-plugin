@@ -1,4 +1,6 @@
 [test]
 
 # Exclude graph-app Playwright tests from bun test (use bun run test:e2e instead)
-# Note: Bun does not support an "exclude" key — use --path-ignore-patterns in the test script
+# Bun does not support an "exclude" key in bunfig.toml — the exclusion is handled
+# via --path-ignore-patterns in the package.json "test" script.
+# Always use `bun run test` (not bare `bun test`) to pick up the ignore pattern.
