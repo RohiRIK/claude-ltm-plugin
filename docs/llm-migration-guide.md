@@ -115,19 +115,27 @@ If it contains `"command": "bun"` pointing to `~/.claude/memory/mcp-server.ts`, 
 
 ### 4d. Remove stale hooks from settings.json
 
-Search for hook commands referencing the old path:
+The `install-wiring.ts` script now automatically detects marketplace installs and removes any stale LTM hook entries from `~/.claude/settings.json`. This handles the common case where a user migrated from a dev/git-clone install (which wired hooks into settings.json) to a marketplace install (which uses `hooks/hooks.json` managed by the plugin system).
+
+After installing the plugin, verify no duplicates remain:
+
+```bash
+grep -E 'SessionStart|UpdateContext|EvaluateSession|PreCompact' ~/.claude/settings.json
+```
+
+If any LTM hook entries still appear in settings.json, they are stale — the plugin system manages hooks via `hooks/hooks.json` using `${CLAUDE_PLUGIN_ROOT}` variable substitution. Remove them manually or re-run:
+
+```bash
+bun run <plugin-root>/scripts/install-wiring.ts <plugin-root>
+```
+
+Also check for hooks referencing the legacy `~/.claude/memory/` path:
 
 ```bash
 grep '~/.claude/memory/' ~/.claude/settings.json
 ```
 
-If any matches, remove those hook entries. The plugin's hooks use `CLAUDE_PLUGIN_ROOT` paths instead. Valid plugin hooks look like:
-
-```
-CLAUDE_PLUGIN_ROOT=/path/to/plugin bun run /path/to/plugin/hooks/src/SessionStart.ts
-```
-
-Any hook referencing `~/.claude/memory/` is stale.
+Any hook referencing `~/.claude/memory/` is stale and should be removed.
 
 ### 4e. Keep legacy DB as backup (recommend)
 

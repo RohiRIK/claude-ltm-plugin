@@ -68,23 +68,67 @@ const settings = JSON.parse(readFileSync(settingsJson, "utf-8"));
 const hooks: Record<string, HookEntry[]> = settings.hooks ?? {};
 settings.hooks = hooks;
 
-const LTM_HOOKS: [string, string][] = [
-  ["SessionStart", `CLAUDE_PLUGIN_ROOT=${root} bun run ${root}/hooks/src/SessionStart.ts`],
-  ["Stop",         `CLAUDE_PLUGIN_ROOT=${root} bun run ${root}/hooks/src/UpdateContext.ts`],
-  ["Stop",         `CLAUDE_PLUGIN_ROOT=${root} bun run ${root}/hooks/src/EvaluateSession.ts`],
-  ["PreCompact",   `CLAUDE_PLUGIN_ROOT=${root} bun run ${root}/hooks/src/PreCompact.ts`],
+// Detect marketplace install: plugin system manages hooks via hooks.json.
+// hooks.json exists in both dev and marketplace installs, but the plugin system
+// only reads it for marketplace installs. Best signal: CLAUDE_PLUGIN_DATA is set,
+// or the plugin cache directory exists.
+const pluginCacheDir = join(CLAUDE_DIR, "plugins", "cache", "ltm");
+const pluginDataDir = join(CLAUDE_DIR, "plugins", "data");
+const hasPluginData = existsSync(pluginDataDir)
+  && readdirSync(pluginDataDir).some(d => d.startsWith("ltm-"));
+const isMarketplaceInstall = !!process.env.CLAUDE_PLUGIN_DATA
+  || existsSync(pluginCacheDir)
+  || hasPluginData;
+
+// Patterns that identify LTM hook entries in settings.json (for cleanup)
+const LTM_HOOK_PATTERNS = [
+  "hooks/src/SessionStart.ts",
+  "hooks/src/UpdateContext.ts",
+  "hooks/src/EvaluateSession.ts",
+  "hooks/src/PreCompact.ts",
 ];
 
-for (const [event, command] of LTM_HOOKS) {
-  hooks[event] ??= [];
-  const already = hooks[event]!.some(e => e.hooks.some(h => h.command.includes(command)));
-  if (!already) {
-    hooks[event]!.push({ matcher: "", hooks: [{ type: "command", command }] });
+if (isMarketplaceInstall) {
+  // Marketplace install: plugin system reads hooks/hooks.json directly.
+  // Clean up any stale LTM hook entries from settings.json (e.g. leftover from
+  // a previous dev/git-clone install or an earlier version of this script).
+  let cleaned = false;
+  for (const event of Object.keys(hooks)) {
+    const before = hooks[event]!.length;
+    hooks[event] = hooks[event]!.filter(
+      (e) => !e.hooks.some((h) => LTM_HOOK_PATTERNS.some((p) => h.command.includes(p)))
+    );
+    if (hooks[event]!.length === 0) {
+      delete hooks[event];
+    }
+    if (hooks[event]?.length !== before) cleaned = true;
   }
-}
+  writeFileSync(settingsJson, JSON.stringify(settings, null, 2));
+  if (cleaned) {
+    console.log("  ✔ Removed stale LTM hooks from ~/.claude/settings.json (now managed by plugin system)");
+  } else {
+    console.log("  ✔ Hooks managed by plugin system (hooks/hooks.json) — settings.json clean");
+  }
+} else {
+  // Dev/git-clone install: no plugin system, wire hooks into settings.json directly
+  const LTM_HOOKS: [string, string][] = [
+    ["SessionStart", `CLAUDE_PLUGIN_ROOT=${root} bun run ${root}/hooks/src/SessionStart.ts`],
+    ["Stop",         `CLAUDE_PLUGIN_ROOT=${root} bun run ${root}/hooks/src/UpdateContext.ts`],
+    ["Stop",         `CLAUDE_PLUGIN_ROOT=${root} bun run ${root}/hooks/src/EvaluateSession.ts`],
+    ["PreCompact",   `CLAUDE_PLUGIN_ROOT=${root} bun run ${root}/hooks/src/PreCompact.ts`],
+  ];
 
-writeFileSync(settingsJson, JSON.stringify(settings, null, 2));
-console.log("  ✔ Hooks wired into ~/.claude/settings.json");
+  for (const [event, command] of LTM_HOOKS) {
+    hooks[event] ??= [];
+    const already = hooks[event]!.some(e => e.hooks.some(h => h.command.includes(command)));
+    if (!already) {
+      hooks[event]!.push({ matcher: "", hooks: [{ type: "command", command }] });
+    }
+  }
+
+  writeFileSync(settingsJson, JSON.stringify(settings, null, 2));
+  console.log("  ✔ Hooks wired into ~/.claude/settings.json (dev install)");
+}
 
 // ── Global git post-commit hook ───────────────────────────────────────────────
 const gitHooksDir = join(CLAUDE_DIR, "hooks", "git");
