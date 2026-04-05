@@ -2,7 +2,7 @@
 
 ## Overview
 
-Per-project context lives in `~/.claude/memory/ltm.db` (SQLite). Hooks manage it automatically.
+Per-project context lives in `$CLAUDE_PLUGIN_DATA/ltm.db` (SQLite). Hooks manage it automatically.
 Project names come from `~/.claude/projects/registry.json` — run `/register-project` to see yours.
 
 **Claude does NOT manually write context files.** Hooks handle all reads and writes.

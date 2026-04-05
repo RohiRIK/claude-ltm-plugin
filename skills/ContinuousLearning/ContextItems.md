@@ -16,7 +16,7 @@ Context items live in the `context_items` table, scoped to a project name from `
 `decision` and `gotcha` items can be promoted into the global `memories` table using `promote(itemId)` from `context.ts`.
 
 ```ts
-import { promote } from "~/.claude/memory/context.js";
+import { promote } from "$CLAUDE_PLUGIN_ROOT/src/context.js";
 const memId = promote(itemId); // returns memory id, or null if not promotable
 ```
 
@@ -63,7 +63,7 @@ This file at `~/.claude/projects/<name>/context-summary.md` is **auto-generated*
 
 ```bash
 bun -e "
-  const { getItems } = await import(\`\${process.env.HOME}/.claude/memory/context.js\`);
+  const { getItems } = await import(\`\${CLAUDE_PLUGIN_ROOT}/src/context.js\`);
   console.log(getItems('myproject'));
 "
 ```

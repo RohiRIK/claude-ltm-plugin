@@ -12,7 +12,7 @@ argument-hint: "[--project X] [--dry-run]"
 Run:
 
 ```bash
-DB="${LTM_DB_PATH:-$HOME/.claude/memory/ltm.db}"
+DB="${LTM_DB_PATH:-$CLAUDE_PLUGIN_DATA/ltm.db}"
 bun --eval "
 const { Database } = require('bun:sqlite');
 const { scrubSecrets } = await import('${CLAUDE_PLUGIN_ROOT}/src/secretsScrubber.js');

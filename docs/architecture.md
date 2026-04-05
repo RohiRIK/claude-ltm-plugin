@@ -57,7 +57,7 @@ settings
 Priority:
   1. LTM_DB_PATH env var            (explicit override -- always wins)
   2. $CLAUDE_PLUGIN_DATA/ltm.db     (marketplace install)
-  3. ~/.claude/memory/ltm.db        (dev / git clone)
+  3. $CLAUDE_PLUGIN_DATA/ltm.db        (dev / git clone)
 
 Code:
   hooks/lib/resolveProject.ts -> getDbPath()

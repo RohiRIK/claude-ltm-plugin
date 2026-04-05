@@ -1,6 +1,6 @@
 # HookIntegration — How Hooks Connect to ltm.db
 
-The four hooks that interact with `~/.claude/memory/ltm.db`:
+The four hooks that interact with `$CLAUDE_PLUGIN_DATA/ltm.db`:
 
 ## Hook → DB Action Table
 
@@ -45,7 +45,7 @@ Injected format (max 30 lines total):
 
 All hooks use dynamic ESM import (not `require`):
 ```ts
-const { addItem } = await import(join(homedir(), ".claude/memory/context.js"));
+const { addItem } = await import(`${CLAUDE_PLUGIN_ROOT}/src/context.js`);
 ```
 
 The `.js` extension is required even though source is `.ts` — Bun resolves it correctly.

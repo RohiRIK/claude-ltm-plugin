@@ -32,7 +32,7 @@ LTM memory (call `mcp__ltm__ltm_learn`):
 
 Context item (bun:sqlite direct):
 ```bash
-DB="${LTM_DB_PATH:-$HOME/.claude/memory/ltm.db}"
+DB="${LTM_DB_PATH:-$CLAUDE_PLUGIN_DATA/ltm.db}"
 bun --eval "
 const { Database } = require('bun:sqlite');
 const db = new Database('$DB');

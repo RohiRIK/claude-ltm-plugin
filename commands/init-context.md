@@ -11,7 +11,7 @@ Match `cwd`. If missing, run `/register-project` first.
 
 **2 — Check for existing goal:**
 ```bash
-DB="${LTM_DB_PATH:-$HOME/.claude/memory/ltm.db}"
+DB="${LTM_DB_PATH:-$CLAUDE_PLUGIN_DATA/ltm.db}"
 bun --eval "
 const { Database } = require('bun:sqlite');
 const db = new Database('$DB');

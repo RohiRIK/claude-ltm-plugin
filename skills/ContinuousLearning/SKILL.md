@@ -7,7 +7,7 @@ version: 2.1.0
 
 # ContinuousLearning
 
-SQLite-backed memory system at `~/.claude/memory/ltm.db`. Two tables: `memories` (global learned insights) and `context_items` (per-project goals/decisions/progress/gotchas).
+SQLite-backed memory system at `$CLAUDE_PLUGIN_DATA/ltm.db`. Two tables: `memories` (global learned insights) and `context_items` (per-project goals/decisions/progress/gotchas).
 
 ## Workflow Routing
 

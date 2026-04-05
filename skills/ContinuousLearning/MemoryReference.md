@@ -1,6 +1,6 @@
 # MemoryReference — LTM Command Reference
 
-Full reference for `/learn`, `/recall`, `/forget`, `/relate` commands backed by `~/.claude/memory/db.ts`.
+Full reference for `/learn`, `/recall`, `/forget`, `/relate` commands backed by `$CLAUDE_PLUGIN_ROOT/src/db.ts`.
 
 ## /learn — Store an Insight
 
@@ -17,7 +17,7 @@ Full reference for `/learn`, `/recall`, `/forget`, `/relate` commands backed by 
 
 **Code pattern:**
 ```ts
-import { learn } from "~/.claude/memory/db.js";
+import { learn } from "$CLAUDE_PLUGIN_ROOT/src/db.js";
 learn({ content, category, importance, project, tags });
 ```
 
@@ -30,7 +30,7 @@ learn({ content, category, importance, project, tags });
 **When to use:** When a `decision` or `gotcha` context item should be elevated to global long-term memory so it persists across all projects and sessions.
 
 ```ts
-import { promote } from "~/.claude/memory/context.js";
+import { promote } from "$CLAUDE_PLUGIN_ROOT/src/context.js";
 const memId = promote(itemId); // returns new memory id, or null if not promotable
 ```
 
@@ -40,7 +40,7 @@ const memId = promote(itemId); // returns new memory id, or null if not promotab
 - `gotcha` → category `gotcha`, importance 4
 - Dedup-safe: calling `promote()` on the same item twice reinforces the memory rather than duplicating it
 
-**Bulk backfill:** Run `bun ~/.claude/memory/backfill-promote.ts` to promote all existing unpromoted decision/gotcha items.
+**Bulk backfill:** Run `bun $CLAUDE_PLUGIN_ROOT/scripts/backfill-promote.ts` to promote all existing unpromoted decision/gotcha items.
 
 ---
 
@@ -79,7 +79,7 @@ const memId = promote(itemId); // returns new memory id, or null if not promotab
 
 **Code pattern:**
 ```ts
-import { forget } from "~/.claude/memory/db.js";
+import { forget } from "$CLAUDE_PLUGIN_ROOT/src/db.js";
 forget({ id, reason });
 ```
 
