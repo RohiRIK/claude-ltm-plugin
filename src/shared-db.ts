@@ -6,11 +6,10 @@
 import { Database } from "bun:sqlite";
 import { existsSync, mkdirSync, readFileSync } from "fs";
 import { join } from "path";
-import { homedir } from "os";
+import { getDbPath, getSchemaPath, CLAUDE_DIR } from "./paths.js";
 
-const CLAUDE_DIR = join(homedir(), ".claude");
-export const DB_PATH = join(CLAUDE_DIR, "memory", "ltm.db");
-const SCHEMA_PATH = join(import.meta.dir, "schema.sql");
+export const DB_PATH = getDbPath();
+const SCHEMA_PATH = getSchemaPath();
 
 let _db: Database | null = null;
 
