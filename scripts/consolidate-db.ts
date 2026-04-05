@@ -133,7 +133,7 @@ async function confirm(message: string): Promise<boolean> {
 
 function mergeDb(sourcePath: string, targetPath: string): { merged: number; skipped: number; total: number } {
   // WAL checkpoint on source before we touch anything
-  const srcDb = new Database(sourcePath, { readonly: false });
+  const srcDb = new Database(sourcePath, { readwrite: true, create: false });
   try {
     srcDb.exec("PRAGMA wal_checkpoint(TRUNCATE)");
   } finally {
@@ -148,7 +148,7 @@ function mergeDb(sourcePath: string, targetPath: string): { merged: number; skip
   console.log("  Backup created ✓");
 
   // Count before
-  const tgtDb = new Database(targetPath, { readonly: false });
+  const tgtDb = new Database(targetPath, { readwrite: true, create: false });
   tgtDb.exec("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;");
 
   const beforeRow = tgtDb.query("SELECT COUNT(*) AS cnt FROM memories").get() as { cnt: number };
