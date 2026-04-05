@@ -10,7 +10,7 @@ import { homedir } from "os";
 
 const CLAUDE_DIR = join(homedir(), ".claude");
 export const DB_PATH = join(CLAUDE_DIR, "memory", "ltm.db");
-const SCHEMA_PATH = join(CLAUDE_DIR, "memory", "schema.sql");
+const SCHEMA_PATH = join(import.meta.dir, "schema.sql");
 
 let _db: Database | null = null;
 
