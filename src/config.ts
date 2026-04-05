@@ -8,6 +8,7 @@
 import { join } from "path";
 import { homedir } from "os";
 import { existsSync } from "fs";
+import { getDbPath } from "./paths.js";
 
 const CONFIG_PATH = join(homedir(), ".claude", "config.json");
 
@@ -47,7 +48,7 @@ export interface Config {
 
 const DEFAULTS: Config = {
   ltm: {
-    dbPath: process.env.LTM_DB_PATH ?? join(homedir(), ".claude", "memory", "ltm.db"),
+    dbPath: getDbPath(),
     decayEnabled: true,
     injectTopN: 15,
     autoRelate: true,

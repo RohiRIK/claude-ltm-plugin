@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * migrations.ts — Versioned schema migration runner for ~/.claude/memory/ltm.db
+ * migrations.ts — Versioned schema migration runner for ltm.db
  * Uses bun:sqlite and Bun file APIs exclusively.
  *
  * CLI: bun migrations.ts [--status | --up | --down | --reset]
@@ -8,12 +8,11 @@
 import { Database } from "bun:sqlite";
 import { readdirSync, existsSync } from "fs";
 import { join } from "path";
-import { homedir } from "os";
 import { createHash } from "crypto";
+import { getDbPath, getMigrationsDir } from "./paths.js";
 
-const CLAUDE_DIR = join(homedir(), ".claude");
-const DB_PATH = join(CLAUDE_DIR, "memory", "ltm.db");
-const MIGRATIONS_DIR = join(CLAUDE_DIR, "migrations");
+const DB_PATH = getDbPath();
+const MIGRATIONS_DIR = getMigrationsDir();
 
 function openDb(): Database {
   const db = new Database(DB_PATH, { create: true });
@@ -233,7 +232,7 @@ if (import.meta.main) {
     if (arg === "--status") {
       const statuses = await getMigrationStatus(db);
       if (statuses.length === 0) {
-        console.log("No migration files found in ~/.claude/migrations/");
+        console.log("No migration files found in migrations/");
       } else {
         console.log("\nMigration Status:");
         console.log("─".repeat(60));

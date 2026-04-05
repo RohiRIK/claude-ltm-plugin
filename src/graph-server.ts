@@ -27,6 +27,7 @@ import { SETTING_DEFAULTS, SETTING_KEYS } from "./janitor/providers/types.js";
 import { anthropicLLM } from "./janitor/providers/anthropic.js";
 import { traverseGraph, buildReasoningContext } from "./graph.js";
 import { detectCommunities, generateClusterLabel, assignClusterColors } from "./cluster.js";
+import { getDbPath, getSchemaPath } from "./paths.js";
 import type { Cluster } from "./graph-app/lib/types.js";
 import { embedText } from "./embeddings.js";
 import { getSimilarMemories } from "./db.js";
@@ -148,7 +149,7 @@ async function fetchProviderModels(
   return empty;
 }
 
-const DB_PATH = join(CLAUDE_DIR, "memory", "ltm.db");
+const DB_PATH = getDbPath();
 const CONFIG_PATH = join(CLAUDE_DIR, "config.json");
 
 function readClaudeConfig(): Record<string, unknown> {
@@ -175,7 +176,7 @@ function deepMerge(base: Record<string, unknown>, patch: Record<string, unknown>
   }
   return out;
 }
-const SCHEMA_PATH = join(CLAUDE_DIR, "memory", "schema.sql");
+const SCHEMA_PATH = getSchemaPath();
 const PID_PATH = join(CLAUDE_DIR, "tmp", "ltm-server.pid");
 const PORT = 7331;
 
@@ -183,7 +184,7 @@ const PORT = 7331;
 const SCHEMA = readFileSync(SCHEMA_PATH, "utf-8");
 
 // Migration 005: cluster tables
-const MIGRATION_005_PATH = join(CLAUDE_DIR, "memory", "migrations", "005_clusters.sql");
+const MIGRATION_005_PATH = join(import.meta.dir, "..", "migrations", "005_clusters.sql");
 const MIGRATION_005 = readFileSync(MIGRATION_005_PATH, "utf-8");
 
 // Ensure tmp dir and write PID

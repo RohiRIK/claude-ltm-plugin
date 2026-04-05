@@ -7,7 +7,7 @@
  *
  * Safe to re-run — dedup_key prevents duplicates in memories table.
  * skipExport=true used throughout to avoid hundreds of redundant file writes.
- * Run: bun ~/.claude/memory/migrate.ts
+ * Run: bun src/migrate.ts
  */
 
 import { existsSync, readFileSync, readdirSync, statSync } from "fs";
